@@ -1,0 +1,589 @@
+import { AU_KM, HELIOPAUSE_KM, HELIOSPHERE_NOSE_LONGITUDE_DEG, TERMINATION_SHOCK_KM } from "../core/data";
+import type { BodyState, CameraState, CelestialBodyData } from "../core/types";
+import { worldToScreen } from "./camera";
+import { computeTrailPoints, drawTrail, isOrbitVisible } from "./orbit";
+
+const MIN_PLANET_SIZE = 4;
+const MIN_MOON_SIZE = 2.5;
+const MIN_SUN_SIZE = 8;
+const MIN_PROBE_SIZE = 3;
+
+const BG_COLOR = "#0a0a12";
+const BG_BLACK = "#000000";
+
+const TRAIL_PLANET_RGB = { r: 80, g: 110, b: 180 };
+const TRAIL_MOON_RGB = { r: 130, g: 160, b: 210 };
+const TRAIL_PROBE_RGB = { r: 50, g: 180, b: 130 };
+
+// ===== Starfield =====
+
+interface StarPoint {
+  x: number;
+  y: number;
+  r: number;
+  g: number;
+  b: number;
+  brightness: number;
+  size: number;
+}
+
+interface NebulaPatch {
+  x: number;
+  y: number;
+  radius: number;
+  r: number;
+  g: number;
+  b: number;
+  alpha: number;
+}
+
+let cachedStars: StarPoint[] | null = null;
+let cachedNebulae: NebulaPatch[] | null = null;
+let cachedStarDimensions = { w: 0, h: 0 };
+
+function seededRandom(seed: number): () => number {
+  let s = seed;
+  return () => {
+    s = (s * 1664525 + 1013904223) & 0xffffffff;
+    return (s >>> 0) / 0xffffffff;
+  };
+}
+
+function generateStarfield(width: number, height: number): { stars: StarPoint[]; nebulae: NebulaPatch[] } {
+  if (cachedStars && cachedNebulae && cachedStarDimensions.w === width && cachedStarDimensions.h === height) {
+    return { stars: cachedStars, nebulae: cachedNebulae };
+  }
+
+  const rand = seededRandom(42);
+  const stars: StarPoint[] = [];
+  const count = Math.floor((width * height) / 400);
+
+  const colors = [
+    { r: 200, g: 210, b: 255, weight: 0.7 }, // blue-white
+    { r: 255, g: 240, b: 200, weight: 0.15 }, // yellow-white
+    { r: 255, g: 200, b: 150, weight: 0.1 }, // warm orange
+    { r: 255, g: 255, b: 255, weight: 0.05 }, // pure bright white
+  ];
+
+  for (let i = 0; i < count; i++) {
+    const roll = rand();
+    let cumulative = 0;
+    let color = colors[0];
+    for (const c of colors) {
+      cumulative += c.weight;
+      if (roll <= cumulative) {
+        color = c;
+        break;
+      }
+    }
+
+    const sizeRoll = rand();
+    let size: number;
+    if (sizeRoll < 0.6)
+      size = 0.5 + rand() * 0.5; // 60% tiny
+    else if (sizeRoll < 0.9)
+      size = 1.0 + rand() * 0.5; // 30% medium
+    else if (sizeRoll < 0.98)
+      size = 1.5 + rand() * 0.5; // 8% larger
+    else size = 2.0 + rand() * 1.0; // 2% bright
+
+    const brightness = size > 2 ? 0.6 + rand() * 0.4 : 0.15 + rand() * 0.5;
+
+    stars.push({
+      x: rand() * width,
+      y: rand() * height,
+      r: color.r,
+      g: color.g,
+      b: color.b,
+      brightness,
+      size,
+    });
+  }
+
+  const nebulaColors = [
+    { r: 80, g: 50, b: 140 }, // deep purple
+    { r: 40, g: 80, b: 150 }, // blue
+    { r: 50, g: 120, b: 110 }, // teal
+    { r: 100, g: 50, b: 80 }, // mauve
+    { r: 30, g: 60, b: 100 }, // dark blue
+  ];
+
+  const nebulae: NebulaPatch[] = [];
+  const nebulaCount = 3 + Math.floor(rand() * 3);
+  for (let i = 0; i < nebulaCount; i++) {
+    const c = nebulaColors[Math.floor(rand() * nebulaColors.length)];
+    nebulae.push({
+      x: rand() * width,
+      y: rand() * height,
+      radius: 150 + rand() * 300,
+      r: c.r,
+      g: c.g,
+      b: c.b,
+      alpha: 0.015 + rand() * 0.02,
+    });
+  }
+
+  cachedStars = stars;
+  cachedNebulae = nebulae;
+  cachedStarDimensions = { w: width, h: height };
+  return { stars, nebulae };
+}
+
+function drawImmersiveBackground(ctx: CanvasRenderingContext2D, width: number, height: number): void {
+  ctx.fillStyle = BG_COLOR;
+  ctx.fillRect(0, 0, width, height);
+
+  const { stars, nebulae } = generateStarfield(width, height);
+
+  for (const neb of nebulae) {
+    const gradient = ctx.createRadialGradient(neb.x, neb.y, 0, neb.x, neb.y, neb.radius);
+    gradient.addColorStop(0, `rgba(${neb.r}, ${neb.g}, ${neb.b}, ${neb.alpha})`);
+    gradient.addColorStop(0.5, `rgba(${neb.r}, ${neb.g}, ${neb.b}, ${neb.alpha * 0.4})`);
+    gradient.addColorStop(1, `rgba(${neb.r}, ${neb.g}, ${neb.b}, 0)`);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(neb.x - neb.radius, neb.y - neb.radius, neb.radius * 2, neb.radius * 2);
+  }
+
+  for (const star of stars) {
+    ctx.fillStyle = `rgba(${star.r}, ${star.g}, ${star.b}, ${star.brightness})`;
+    if (star.size > 2) {
+      ctx.beginPath();
+      ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+      ctx.fill();
+      const glow = ctx.createRadialGradient(star.x, star.y, 0, star.x, star.y, star.size * 3);
+      glow.addColorStop(0, `rgba(${star.r}, ${star.g}, ${star.b}, ${star.brightness * 0.3})`);
+      glow.addColorStop(1, `rgba(${star.r}, ${star.g}, ${star.b}, 0)`);
+      ctx.fillStyle = glow;
+      ctx.fillRect(star.x - star.size * 3, star.y - star.size * 3, star.size * 6, star.size * 6);
+    } else {
+      ctx.fillRect(star.x, star.y, star.size, star.size);
+    }
+  }
+}
+
+// ===== Body rendering helpers =====
+
+function drawSunGlow(ctx: CanvasRenderingContext2D, sx: number, sy: number, radiusPx: number): void {
+  const glowRadius = Math.max(radiusPx * 4, 20);
+  const gradient = ctx.createRadialGradient(sx, sy, radiusPx * 0.5, sx, sy, glowRadius);
+  gradient.addColorStop(0, "rgba(253, 184, 19, 0.4)");
+  gradient.addColorStop(0.3, "rgba(253, 184, 19, 0.15)");
+  gradient.addColorStop(0.7, "rgba(253, 140, 0, 0.05)");
+  gradient.addColorStop(1, "rgba(253, 140, 0, 0)");
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(sx, sy, glowRadius, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawSelectionIndicator(ctx: CanvasRenderingContext2D, sx: number, sy: number, radius: number): void {
+  const indicatorRadius = radius + 6;
+  ctx.beginPath();
+  ctx.arc(sx, sy, indicatorRadius, 0, Math.PI * 2);
+  ctx.strokeStyle = "rgba(100, 150, 255, 0.7)";
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 4]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawDiamond(ctx: CanvasRenderingContext2D, sx: number, sy: number, size: number, color: string): void {
+  ctx.beginPath();
+  ctx.moveTo(sx, sy - size);
+  ctx.lineTo(sx + size, sy);
+  ctx.lineTo(sx, sy + size);
+  ctx.lineTo(sx - size, sy);
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+}
+
+function getDisplayRadius(body: CelestialBodyData, kmPerPixel: number, humanEyeScale: boolean): number {
+  const realRadiusPx = body.radius / kmPerPixel;
+
+  if (!humanEyeScale) return Math.max(realRadiusPx, 0.5);
+
+  if (body.type === "star") return Math.max(realRadiusPx, MIN_SUN_SIZE);
+  if (body.type === "moon") return Math.max(realRadiusPx, MIN_MOON_SIZE);
+  if (body.type === "probe") return Math.max(realRadiusPx, MIN_PROBE_SIZE);
+  return Math.max(realRadiusPx, MIN_PLANET_SIZE);
+}
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const h = hex.replace("#", "");
+  return {
+    r: parseInt(h.substring(0, 2), 16),
+    g: parseInt(h.substring(2, 4), 16),
+    b: parseInt(h.substring(4, 6), 16),
+  };
+}
+
+// ===== Label collision system =====
+
+const TYPE_PRIORITY: Record<string, number> = {
+  star: 400,
+  planet: 300,
+  "dwarf-planet": 200,
+  moon: 100,
+  probe: 150,
+};
+
+interface LabelCandidate {
+  bodyId: string;
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  fontSize: number;
+  priority: number;
+  isProbe: boolean;
+}
+
+function labelsOverlap(a: LabelCandidate, b: LabelCandidate): boolean {
+  const pad = 4;
+  const aLeft = a.x - pad;
+  const aRight = a.x + a.width + pad;
+  const aTop = a.y - a.height - pad;
+  const aBottom = a.y + pad;
+
+  const bLeft = b.x - pad;
+  const bRight = b.x + b.width + pad;
+  const bTop = b.y - b.height - pad;
+  const bBottom = b.y + pad;
+
+  return !(aRight < bLeft || bRight < aLeft || aBottom < bTop || bBottom < aTop);
+}
+
+function resolveLabels(
+  ctx: CanvasRenderingContext2D,
+  bodies: CelestialBodyData[],
+  bodyStates: Map<string, BodyState>,
+  camera: CameraState,
+  width: number,
+  height: number,
+  humanEyeScale: boolean,
+  selectedBodyId: string,
+): LabelCandidate[] {
+  const candidates: LabelCandidate[] = [];
+  const font = "'JetBrains Mono', 'Fira Code', monospace";
+
+  for (const body of bodies) {
+    const state = bodyStates.get(body.id);
+    if (!state) continue;
+
+    const screen = worldToScreen(state.position, camera, width, height);
+    if (screen.x < -50 || screen.x > width + 50 || screen.y < -50 || screen.y > height + 50) continue;
+
+    if (body.type === "moon" && body.orbit) {
+      if (camera.kmPerPixel > body.orbit.semiMajorAxis / 200) continue;
+    }
+
+    const radiusPx = getDisplayRadius(body, camera.kmPerPixel, humanEyeScale);
+    const fontSize = body.type === "star" ? 12 : body.type === "moon" ? 9 : body.type === "probe" ? 9 : 11;
+
+    ctx.font = `${fontSize}px ${font}`;
+    const textWidth = ctx.measureText(body.name).width;
+
+    const labelX = screen.x + radiusPx + 4;
+    const labelY = screen.y + fontSize / 3;
+
+    const isSelected = body.id === selectedBodyId;
+    const priority = (isSelected ? 10000 : 0) + (TYPE_PRIORITY[body.type] ?? 0) + Math.log10(body.radius + 1);
+
+    candidates.push({
+      bodyId: body.id,
+      text: body.name,
+      x: labelX,
+      y: labelY,
+      width: textWidth,
+      height: fontSize,
+      fontSize,
+      priority,
+      isProbe: body.type === "probe",
+    });
+  }
+
+  candidates.sort((a, b) => b.priority - a.priority);
+
+  const placed: LabelCandidate[] = [];
+  for (const c of candidates) {
+    let overlaps = false;
+    for (const p of placed) {
+      if (labelsOverlap(c, p)) {
+        overlaps = true;
+        break;
+      }
+    }
+    if (!overlaps) placed.push(c);
+  }
+
+  return placed;
+}
+
+// ===== Heliosphere rendering =====
+
+const DEG_TO_RAD = Math.PI / 180;
+
+/**
+ * Draw the heliosphere boundaries (termination shock and heliopause).
+ * Rendered as slightly elongated ellipses: compressed on the nose side
+ * (Sun's direction of travel through ISM) and extended on the tail side.
+ */
+function drawHeliosphere(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  camera: CameraState,
+  sunPosition: { x: number; y: number },
+): void {
+  const sunScreen = worldToScreen(sunPosition, camera, width, height);
+
+  // Nose direction in ecliptic coordinates (Sun's motion through ISM ~255° ecl. longitude)
+  const noseAngle = HELIOSPHERE_NOSE_LONGITUDE_DEG * DEG_TO_RAD;
+
+  const boundaries = [
+    {
+      label: "Termination Shock",
+      noseRadius: TERMINATION_SHOCK_KM * 0.93, // ~84 AU on nose side (V2 crossed at 84)
+      tailRadius: TERMINATION_SHOCK_KM * 1.07, // ~96 AU on tail side
+      color: "rgba(100, 180, 255, 0.25)",
+      labelColor: "rgba(100, 180, 255, 0.5)",
+    },
+    {
+      label: "Heliopause",
+      noseRadius: HELIOPAUSE_KM * 0.99, // ~119 AU on nose (V2 crossing)
+      tailRadius: HELIOPAUSE_KM * 1.25, // ~150 AU on tail side
+      color: "rgba(180, 120, 255, 0.25)",
+      labelColor: "rgba(180, 120, 255, 0.5)",
+    },
+  ];
+
+  for (const boundary of boundaries) {
+    const a = (boundary.noseRadius + boundary.tailRadius) / 2;
+    const c = (boundary.tailRadius - boundary.noseRadius) / 2; // center offset toward tail
+
+    const aPx = a / camera.kmPerPixel;
+    const cPx = c / camera.kmPerPixel;
+
+    if (aPx < 10 || aPx > width * 30) continue;
+
+    // Offset the ellipse center toward the tail (opposite nose)
+    const tailAngle = noseAngle + Math.PI;
+    const centerX = sunScreen.x + cPx * Math.cos(tailAngle);
+    const centerY = sunScreen.y - cPx * Math.sin(tailAngle);
+
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    ctx.rotate(-noseAngle); // screen Y is flipped
+
+    const semiMajorPx = a / camera.kmPerPixel;
+    const semiMinorPx = Math.sqrt(boundary.noseRadius * boundary.tailRadius) / camera.kmPerPixel;
+
+    ctx.beginPath();
+    ctx.ellipse(0, 0, semiMajorPx, semiMinorPx, 0, 0, Math.PI * 2);
+    ctx.strokeStyle = boundary.color;
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([8, 6]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.restore();
+
+    const labelRadiusPx = (boundary.noseRadius * 0.99) / camera.kmPerPixel;
+    const labelX = sunScreen.x;
+    const labelY = sunScreen.y - labelRadiusPx - 8;
+
+    if (labelY > 0 && labelY < height && labelX > 0 && labelX < width) {
+      ctx.font = "9px 'JetBrains Mono', 'Fira Code', monospace";
+      ctx.fillStyle = boundary.labelColor;
+      ctx.textAlign = "center";
+      const auLabel = `${boundary.label} (~${Math.round((boundary.noseRadius + boundary.tailRadius) / 2 / AU_KM)} AU)`;
+      ctx.fillText(auLabel, labelX, labelY);
+    }
+  }
+}
+
+// ===== Main render =====
+
+export function renderScene(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  camera: CameraState,
+  bodyStates: Map<string, BodyState>,
+  bodies: CelestialBodyData[],
+  _bodyMap: ReadonlyMap<string, CelestialBodyData>,
+  selectedBodyId: string,
+  humanEyeScale: boolean,
+  simTime: number,
+  immersiveBackground: boolean,
+  maxOrbitRadius: number,
+  showHeliosphere: boolean = false,
+): void {
+  if (immersiveBackground) {
+    drawImmersiveBackground(ctx, width, height);
+  } else {
+    ctx.fillStyle = BG_BLACK;
+    ctx.fillRect(0, 0, width, height);
+  }
+
+  if (showHeliosphere) {
+    const sunState = bodyStates.get(bodies[0]?.id ?? "sun");
+    const sunPos = sunState?.position ?? { x: 0, y: 0 };
+    drawHeliosphere(ctx, width, height, camera, sunPos);
+  }
+
+  for (const body of bodies) {
+    if (!body.orbit) continue;
+    if (!isOrbitVisible(body.orbit, camera.kmPerPixel, width)) continue;
+
+    const parentId = body.parentId ?? bodies[0]?.id ?? "sun";
+    const parentState = bodyStates.get(parentId);
+    if (!parentState) continue;
+
+    const parentScreen = worldToScreen(parentState.position, camera, width, height);
+
+    const clipRadius = body.orbit.eccentricity >= 1.0 ? maxOrbitRadius * 2 : undefined;
+    const trailPoints = computeTrailPoints(body, simTime, clipRadius);
+
+    const bodyRgb = hexToRgb(body.color);
+    const baseRgb = body.type === "probe" ? TRAIL_PROBE_RGB : body.type === "moon" ? TRAIL_MOON_RGB : TRAIL_PLANET_RGB;
+    const r = Math.round(bodyRgb.r * 0.4 + baseRgb.r * 0.6);
+    const g = Math.round(bodyRgb.g * 0.4 + baseRgb.g * 0.6);
+    const b = Math.round(bodyRgb.b * 0.4 + baseRgb.b * 0.6);
+
+    const maxAlpha = body.type === "moon" ? 0.35 : body.type === "probe" ? 0.45 : 0.5;
+    const lineWidth = body.type === "moon" ? 0.8 : body.type === "probe" ? 1.0 : 1.2;
+
+    drawTrail(ctx, trailPoints, parentScreen.x, parentScreen.y, camera.kmPerPixel, r, g, b, maxAlpha, lineWidth);
+  }
+
+  for (const body of bodies) {
+    const state = bodyStates.get(body.id);
+    if (!state) continue;
+
+    const screen = worldToScreen(state.position, camera, width, height);
+    if (screen.x < -100 || screen.x > width + 100 || screen.y < -100 || screen.y > height + 100) continue;
+
+    const radiusPx = getDisplayRadius(body, camera.kmPerPixel, humanEyeScale);
+
+    if (body.type === "star") {
+      drawSunGlow(ctx, screen.x, screen.y, radiusPx);
+    }
+
+    if (body.type === "probe") {
+      drawDiamond(ctx, screen.x, screen.y, Math.max(radiusPx, 3), body.color);
+    } else {
+      ctx.beginPath();
+      ctx.arc(screen.x, screen.y, radiusPx, 0, Math.PI * 2);
+      ctx.fillStyle = body.color;
+      ctx.fill();
+    }
+
+    if (body.id === selectedBodyId) {
+      drawSelectionIndicator(ctx, screen.x, screen.y, radiusPx);
+    }
+  }
+
+  const labels = resolveLabels(ctx, bodies, bodyStates, camera, width, height, humanEyeScale, selectedBodyId);
+  for (const label of labels) {
+    ctx.font = `${label.fontSize}px 'JetBrains Mono', 'Fira Code', monospace`;
+    if (label.bodyId === selectedBodyId) {
+      ctx.fillStyle = "rgba(220, 230, 255, 0.95)";
+    } else if (label.isProbe) {
+      ctx.fillStyle = "rgba(100, 220, 180, 0.8)";
+    } else {
+      ctx.fillStyle = "rgba(200, 210, 230, 0.8)";
+    }
+    ctx.textAlign = "left";
+    ctx.fillText(label.text, label.x, label.y);
+  }
+}
+
+export function renderMinimap(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  bodies: CelestialBodyData[],
+  bodyStates: Map<string, BodyState>,
+  mainCamera: CameraState,
+  mainCanvasWidth: number,
+  mainCanvasHeight: number,
+  selectedBodyId: string,
+  maxOrbitRadius: number,
+): void {
+  ctx.fillStyle = "rgba(10, 10, 18, 0.85)";
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.strokeStyle = "rgba(60, 80, 120, 0.5)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(0, 0, width, height);
+
+  const scale = Math.min(width, height) / (maxOrbitRadius * 2.4);
+  const cx = width / 2;
+  const cy = height / 2;
+
+  for (const body of bodies) {
+    if (body.type === "moon") continue;
+    const state = bodyStates.get(body.id);
+    if (!state) continue;
+
+    const sx = cx + state.position.x * scale;
+    const sy = cy - state.position.y * scale;
+
+    const dotSize = body.type === "star" ? 3 : body.type === "probe" ? 1 : body.type === "dwarf-planet" ? 1 : 1.5;
+    ctx.fillStyle = body.id === selectedBodyId ? "#6496ff" : body.color;
+    ctx.beginPath();
+    ctx.arc(sx, sy, dotSize, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const halfViewW = (mainCanvasWidth * mainCamera.kmPerPixel) / 2;
+  const halfViewH = (mainCanvasHeight * mainCamera.kmPerPixel) / 2;
+  const viewLeft = cx + (mainCamera.center.x - halfViewW) * scale;
+  const viewTop = cy - (mainCamera.center.y + halfViewH) * scale;
+  const viewW = halfViewW * 2 * scale;
+  const viewH = halfViewH * 2 * scale;
+
+  if (viewW < width * 2 && viewH < height * 2) {
+    ctx.strokeStyle = "rgba(100, 150, 255, 0.6)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(viewLeft, viewTop, viewW, viewH);
+  }
+}
+
+export function hitTestBody(
+  screenX: number,
+  screenY: number,
+  camera: CameraState,
+  canvasWidth: number,
+  canvasHeight: number,
+  bodies: CelestialBodyData[],
+  bodyStates: Map<string, BodyState>,
+  humanEyeScale: boolean,
+): string | null {
+  let closest: string | null = null;
+  let closestDist = Infinity;
+
+  const reversed = [...bodies].reverse();
+  for (const body of reversed) {
+    const state = bodyStates.get(body.id);
+    if (!state) continue;
+
+    const screen = worldToScreen(state.position, camera, canvasWidth, canvasHeight);
+    const radiusPx = getDisplayRadius(body, camera.kmPerPixel, humanEyeScale);
+    const hitRadius = Math.max(radiusPx, 8);
+
+    const dx = screenX - screen.x;
+    const dy = screenY - screen.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist <= hitRadius && dist < closestDist) {
+      closest = body.id;
+      closestDist = dist;
+    }
+  }
+
+  return closest;
+}
