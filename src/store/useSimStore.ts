@@ -12,7 +12,7 @@ import { computeAllPositions } from "../core/simulation";
 import type { BodyState, CameraState, CelestialBodyData, OrbitPath, SystemDefinition } from "../core/types";
 import type { ViewMode } from "../core/types3d";
 import { clampZoom, DEEP_ZOOM_THRESHOLD, getAutoZoomLevel } from "../rendering/camera";
-import { clearTrailCache, precomputeAllOrbits } from "../rendering/orbit";
+import { precomputeAllOrbits } from "../rendering/orbit";
 
 interface SimStore {
   // System

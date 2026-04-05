@@ -1,4 +1,4 @@
-import { computeOrbitalPosition, computeOrbitPath } from "../core/kepler";
+import { computeOrbitalPosition } from "../core/kepler";
 import type { CelestialBodyData, OrbitalElements, OrbitPath, Vec2 } from "../core/types";
 
 const PLANET_ORBIT_POINTS = 360;
@@ -164,8 +164,6 @@ export function drawTrail(
     startX = parentScreenX + points[0] * invKm;
     startY = parentScreenY - points[1] * invKm;
   }
-
-  const totalSegments = numPoints + (hasTip ? 0 : -1);
 
   for (let i = 0; i < numPoints; i++) {
     const progress = i / (numPoints || 1);

@@ -521,7 +521,7 @@ export function renderScene(
   showKuiperBelt: boolean = false,
   showSelectionIndicator: boolean = true,
   showFullOrbits: boolean = false,
-  orbitPaths?: Map<string, { bodyId: string; points: import("../core/types").Vec2[] }>,
+  orbitPaths?: Map<string, import("../core/types").OrbitPath>,
   showOortCloud: boolean = false,
   showProbes: boolean = true,
   showDwarfPlanets: boolean = true,
@@ -602,7 +602,7 @@ export function renderScene(
       if (!isOrbitVisible(body.orbit, camera.kmPerPixel, width)) continue;
 
       const orbitPath = orbitPaths.get(body.id);
-      if (!orbitPath || orbitPath.points.length < 2) continue;
+      if (!orbitPath || orbitPath.points.length < 4) continue;
 
       const parentId = body.parentId ?? bodies[0]?.id ?? "sun";
       const parentState = bodyStates.get(parentId);
@@ -610,12 +610,15 @@ export function renderScene(
 
       const parentScreen = worldToScreen(parentState.position, camera, width, height);
       const alpha = body.type === "moon" ? 0.15 : 0.2;
+      const pts = orbitPath.points;
+      const numPoints = pts.length / 2;
 
       ctx.beginPath();
-      for (let i = 0; i < orbitPath.points.length; i++) {
-        const p = orbitPath.points[i];
-        const x = parentScreen.x + p.x / camera.kmPerPixel;
-        const y = parentScreen.y - p.y / camera.kmPerPixel;
+      for (let i = 0; i < numPoints; i++) {
+        const px = pts[i * 2];
+        const py = pts[i * 2 + 1];
+        const x = parentScreen.x + px / camera.kmPerPixel;
+        const y = parentScreen.y - py / camera.kmPerPixel;
         if (i === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
       }
