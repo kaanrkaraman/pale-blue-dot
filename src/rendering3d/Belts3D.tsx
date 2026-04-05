@@ -1,23 +1,22 @@
-import { useRef } from "react";
-import { useThree, useFrame } from "@react-three/fiber";
-import * as THREE from "three";
 import { Html } from "@react-three/drei";
+import { useFrame, useThree } from "@react-three/fiber";
+import { useRef } from "react";
+import * as THREE from "three";
 import {
-  AU_KM,
   ASTEROID_BELT_INNER_KM,
   ASTEROID_BELT_OUTER_KM,
+  AU_KM,
+  JUPITER_RING_INNER_KM,
+  JUPITER_RING_OUTER_KM,
   KUIPER_BELT_INNER_KM,
   KUIPER_BELT_OUTER_KM,
   OORT_CLOUD_INNER_KM,
   OORT_CLOUD_OUTER_KM,
-  JUPITER_RING_INNER_KM,
-  JUPITER_RING_OUTER_KM,
   SATURN_RING_INNER_KM,
   SATURN_RING_OUTER_KM,
 } from "../core/data";
 import type { BodyState3D } from "../core/types3d";
-import { toThreePos } from "./constants";
-import { KM_TO_SCENE } from "./constants";
+import { KM_TO_SCENE, toThreePos } from "./constants";
 
 function BeltRing({
   innerRadius,
@@ -67,34 +66,16 @@ function BeltRing({
     <group>
       <mesh rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[inner, outer, 128]} />
-        <meshBasicMaterial
-          color={color}
-          transparent
-          opacity={opacity}
-          depthWrite={false}
-          side={THREE.DoubleSide}
-        />
+        <meshBasicMaterial color={color} transparent opacity={opacity} depthWrite={false} side={THREE.DoubleSide} />
       </mesh>
 
       <mesh rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[inner, inner * 1.001, 128]} />
-        <meshBasicMaterial
-          color={color}
-          transparent
-          opacity={opacity * 3}
-          depthWrite={false}
-          side={THREE.DoubleSide}
-        />
+        <meshBasicMaterial color={color} transparent opacity={opacity * 3} depthWrite={false} side={THREE.DoubleSide} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[outer * 0.999, outer, 128]} />
-        <meshBasicMaterial
-          color={color}
-          transparent
-          opacity={opacity * 3}
-          depthWrite={false}
-          side={THREE.DoubleSide}
-        />
+        <meshBasicMaterial color={color} transparent opacity={opacity * 3} depthWrite={false} side={THREE.DoubleSide} />
       </mesh>
 
       <Html
@@ -184,23 +165,11 @@ function PlanetaryRing({
     <group position={position}>
       <mesh rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[inner, outer, 128]} />
-        <meshBasicMaterial
-          color={color}
-          transparent
-          opacity={opacity}
-          depthWrite={false}
-          side={THREE.DoubleSide}
-        />
+        <meshBasicMaterial color={color} transparent opacity={opacity} depthWrite={false} side={THREE.DoubleSide} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[outer * 0.998, outer, 128]} />
-        <meshBasicMaterial
-          color={color}
-          transparent
-          opacity={opacity * 2}
-          depthWrite={false}
-          side={THREE.DoubleSide}
-        />
+        <meshBasicMaterial color={color} transparent opacity={opacity * 2} depthWrite={false} side={THREE.DoubleSide} />
       </mesh>
     </group>
   );

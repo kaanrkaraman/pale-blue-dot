@@ -17,7 +17,7 @@ const SETTING_INFO: Record<string, string> = {
   "3D Probe Models": "Render detailed 3D models for each space probe",
   "Asteroid Belt": "Rocky debris field between Mars and Jupiter, 2.1 \u2013 3.3 AU from the Sun",
   "Kuiper Belt": "Icy bodies beyond Neptune, 30 \u2013 50 AU. Home of Pluto and other dwarf planets",
-  "Heliosphere": "Solar wind boundary where interstellar medium begins, roughly 120 AU out",
+  Heliosphere: "Solar wind boundary where interstellar medium begins, roughly 120 AU out",
   "Oort Cloud": "Theoretical spherical shell of comets extending 2,000 \u2013 100,000 AU from the Sun",
   "Ecliptic Plane": "Reference grid on the plane of Earth's orbit around the Sun",
   Comets: "Famous periodic comets including Halley, Encke, Hale-Bopp, and more",
@@ -89,7 +89,15 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
       <div className="settings-header">
         <span className="settings-title">Settings</span>
         <button type="button" className="settings-close" onClick={onClose}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          >
             <line x1="18" y1="6" x2="6" y2="18" />
             <line x1="6" y1="6" x2="18" y2="18" />
           </svg>
@@ -100,8 +108,20 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
         {/* Display Column */}
         <div className="settings-column">
           <div className="settings-column-title">Display</div>
-          <SettingsRow label="3D Mode" shortcut="V" active={viewMode === "3d"} onToggle={toggleViewMode} onHover={setHoveredSetting} />
-          <SettingsRow label="Human Eye Scale" shortcut="M" active={humanEyeScale} onToggle={toggleHumanEyeScale} onHover={setHoveredSetting} />
+          <SettingsRow
+            label="3D Mode"
+            shortcut="V"
+            active={viewMode === "3d"}
+            onToggle={toggleViewMode}
+            onHover={setHoveredSetting}
+          />
+          <SettingsRow
+            label="Human Eye Scale"
+            shortcut="M"
+            active={humanEyeScale}
+            onToggle={toggleHumanEyeScale}
+            onHover={setHoveredSetting}
+          />
           <SettingsRow
             label="Immersive Background"
             shortcut="I"
@@ -109,7 +129,13 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
             onToggle={toggleImmersiveBackground}
             onHover={setHoveredSetting}
           />
-          <SettingsRow label="Full Orbits" shortcut="O" active={showFullOrbits} onToggle={toggleFullOrbits} onHover={setHoveredSetting} />
+          <SettingsRow
+            label="Full Orbits"
+            shortcut="O"
+            active={showFullOrbits}
+            onToggle={toggleFullOrbits}
+            onHover={setHoveredSetting}
+          />
           <SettingsRow
             label="Selection Indicator"
             shortcut="S"
@@ -122,9 +148,27 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
         {/* Objects Column */}
         <div className="settings-column">
           <div className="settings-column-title">Objects</div>
-          <SettingsRow label="Space Probes" shortcut="P" active={showProbes} onToggle={toggleShowProbes} onHover={setHoveredSetting} />
-          <SettingsRow label="Dwarf Planets" shortcut="D" active={showDwarfPlanets} onToggle={toggleShowDwarfPlanets} onHover={setHoveredSetting} />
-          <SettingsRow label="Comets" shortcut="G" active={showComets} onToggle={toggleShowComets} onHover={setHoveredSetting} />
+          <SettingsRow
+            label="Space Probes"
+            shortcut="P"
+            active={showProbes}
+            onToggle={toggleShowProbes}
+            onHover={setHoveredSetting}
+          />
+          <SettingsRow
+            label="Dwarf Planets"
+            shortcut="D"
+            active={showDwarfPlanets}
+            onToggle={toggleShowDwarfPlanets}
+            onHover={setHoveredSetting}
+          />
+          <SettingsRow
+            label="Comets"
+            shortcut="G"
+            active={showComets}
+            onToggle={toggleShowComets}
+            onHover={setHoveredSetting}
+          />
           <SettingsRow
             label="3D Probe Models"
             shortcut="R"
@@ -139,10 +183,34 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
         {/* Layers Column */}
         <div className="settings-column">
           <div className="settings-column-title">Layers</div>
-          <SettingsRow label="Asteroid Belt" shortcut="A" active={showAsteroidBelt} onToggle={toggleAsteroidBelt} onHover={setHoveredSetting} />
-          <SettingsRow label="Kuiper Belt" shortcut="K" active={showKuiperBelt} onToggle={toggleKuiperBelt} onHover={setHoveredSetting} />
-          <SettingsRow label="Heliosphere" shortcut="H" active={showHeliosphere} onToggle={toggleShowHeliosphere} onHover={setHoveredSetting} />
-          <SettingsRow label="Oort Cloud" shortcut="C" active={showOortCloud} onToggle={toggleOortCloud} onHover={setHoveredSetting} />
+          <SettingsRow
+            label="Asteroid Belt"
+            shortcut="A"
+            active={showAsteroidBelt}
+            onToggle={toggleAsteroidBelt}
+            onHover={setHoveredSetting}
+          />
+          <SettingsRow
+            label="Kuiper Belt"
+            shortcut="K"
+            active={showKuiperBelt}
+            onToggle={toggleKuiperBelt}
+            onHover={setHoveredSetting}
+          />
+          <SettingsRow
+            label="Heliosphere"
+            shortcut="H"
+            active={showHeliosphere}
+            onToggle={toggleShowHeliosphere}
+            onHover={setHoveredSetting}
+          />
+          <SettingsRow
+            label="Oort Cloud"
+            shortcut="C"
+            active={showOortCloud}
+            onToggle={toggleOortCloud}
+            onHover={setHoveredSetting}
+          />
           <SettingsRow
             label="Ecliptic Plane"
             shortcut="E"
@@ -157,7 +225,16 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
 
       {/* Info Strip */}
       <div className={`settings-info${infoText ? " visible" : ""}`}>
-        <svg className="settings-info-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+        <svg
+          className="settings-info-icon"
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        >
           <circle cx="12" cy="12" r="10" />
           <line x1="12" y1="16" x2="12" y2="12" />
           <line x1="12" y1="8" x2="12.01" y2="8" />

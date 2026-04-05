@@ -1,11 +1,11 @@
-import { useRef, useMemo } from "react";
-import * as THREE from "three";
 import { useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
-import { useSimStore } from "../store";
-import type { BodyState3D } from "../core/types3d";
+import { useMemo, useRef } from "react";
+import * as THREE from "three";
 import type { CelestialBodyData } from "../core/types";
-import { toThreePos, toThreeRadius, MIN_DISPLAY, MIN_REAL } from "./constants";
+import type { BodyState3D } from "../core/types3d";
+import { useSimStore } from "../store";
+import { MIN_DISPLAY, MIN_REAL, toThreePos, toThreeRadius } from "./constants";
 
 const PROBE_MODEL_IDS = ["voyager-1", "voyager-2", "pioneer-10", "pioneer-11", "new-horizons"] as const;
 
@@ -18,8 +18,6 @@ function cloneAndFixMaterials(scene: THREE.Object3D): THREE.Object3D {
     const fixed = materials.map((m) => {
       const c = m.clone();
       if (c instanceof THREE.MeshStandardMaterial) {
-        // Without an environment map, high metalness makes PBR surfaces black/grey.
-        // Cap metalness and ensure roughness so the ambient + point light contribute.
         c.metalness = Math.min(c.metalness, 0.3);
         c.roughness = Math.max(c.roughness, 0.4);
         c.needsUpdate = true;
@@ -175,7 +173,7 @@ function BodyMesh({
   const radius = getDisplayRadius(body, humanEyeScale);
   const isStar = body.type === "star";
   const isProbe = body.type === "probe" || body.type === "comet";
-  const hasModel = showProbeModels && isProbe && PROBE_MODEL_IDS.includes(body.id as typeof PROBE_MODEL_IDS[number]);
+  const hasModel = showProbeModels && isProbe && PROBE_MODEL_IDS.includes(body.id as (typeof PROBE_MODEL_IDS)[number]);
 
   return (
     <group position={pos}>
@@ -209,19 +207,12 @@ function BodyMesh({
         </mesh>
       )}
 
-      {isStar && (
-        <pointLight color={body.color} intensity={3} distance={0} decay={2} />
-      )}
+      {isStar && <pointLight color={body.color} intensity={3} distance={0} decay={2} />}
 
       {isSelected && showIndicator && (
         <mesh>
           <sphereGeometry args={[radius * 1.6, 24, 24]} />
-          <meshBasicMaterial
-            color="#4a9eff"
-            wireframe
-            transparent
-            opacity={0.35}
-          />
+          <meshBasicMaterial color="#4a9eff" wireframe transparent opacity={0.35} />
         </mesh>
       )}
     </group>
@@ -234,13 +225,31 @@ useGLTF.preload("/voyager-antenna.glb");
 useGLTF.preload("/pioneer.glb");
 useGLTF.preload("/new-horizons.glb");
 
-export function Bodies3D({ bodyStates3D, showProbeModels }: { bodyStates3D: Map<string, BodyState3D>; showProbeModels: boolean }) {
+export function Bodies3D({
+  bodyStates3D,
+  showProbeModels,
+  showProbes,
+  showDwarfPlanets,
+  showComets,
+}: {
+  bodyStates3D: Map<string, BodyState3D>;
+  showProbeModels: boolean;
+  showProbes: boolean;
+  showDwarfPlanets: boolean;
+  showComets: boolean;
+}) {
   const activeBodies = useSimStore((s) => s.activeBodies);
   const selectedBodyId = useSimStore((s) => s.selectedBodyId);
   const humanEyeScale = useSimStore((s) => s.humanEyeScale);
   const showSelectionIndicator = useSimStore((s) => s.showSelectionIndicator);
 
-  // Get Earth position for probe antenna orientation (fall back to Sun = origin)
+  const visibleBodies = activeBodies.filter((b) => {
+    if (b.type === "probe") return showProbes;
+    if (b.type === "dwarf-planet") return showDwarfPlanets;
+    if (b.type === "comet") return showComets;
+    return true;
+  });
+
   const earthState = bodyStates3D.get("earth");
   const earthPos = useMemo(() => {
     if (!earthState) return null;
@@ -250,7 +259,7 @@ export function Bodies3D({ bodyStates3D, showProbeModels }: { bodyStates3D: Map<
 
   return (
     <>
-      {activeBodies.map((body) => {
+      {visibleBodies.map((body) => {
         const state3d = bodyStates3D.get(body.id);
         if (!state3d) return null;
         return (

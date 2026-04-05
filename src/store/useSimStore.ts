@@ -1,5 +1,13 @@
 import { create } from "zustand";
-import { buildBodyMap, COMETS, currentDaysSinceJ2000, EXTRA_DWARF_PLANETS, getChildrenFrom, SOLAR_SYSTEM, SPACE_PROBES } from "../core/data";
+import {
+  buildBodyMap,
+  COMETS,
+  currentDaysSinceJ2000,
+  EXTRA_DWARF_PLANETS,
+  getChildrenFrom,
+  SOLAR_SYSTEM,
+  SPACE_PROBES,
+} from "../core/data";
 import { computeAllPositions } from "../core/simulation";
 import type { BodyState, CameraState, CelestialBodyData, OrbitPath, SystemDefinition } from "../core/types";
 import type { ViewMode } from "../core/types3d";
@@ -74,7 +82,9 @@ interface SimStore {
   init: (system?: SystemDefinition) => void;
 }
 
-export const SPEED_STEPS = [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 30, 60, 182.625, 365.25, 730.5, 3652.5, 18262.5, 36525];
+export const SPEED_STEPS = [
+  0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 30, 60, 182.625, 365.25, 730.5, 3652.5, 18262.5, 36525,
+];
 
 function findClosestSpeedIndex(speed: number): number {
   let closest = 0;
@@ -91,12 +101,8 @@ function findClosestSpeedIndex(speed: number): number {
 
 const ZOOM_FACTOR = 1.1;
 
-function computeActiveBodies(system: SystemDefinition, showProbes: boolean, showDwarfPlanets: boolean, showComets: boolean): CelestialBodyData[] {
-  let bodies = system.bodies;
-  if (showDwarfPlanets) bodies = [...bodies, ...EXTRA_DWARF_PLANETS];
-  if (showProbes) bodies = [...bodies, ...SPACE_PROBES];
-  if (showComets) bodies = [...bodies, ...COMETS];
-  return bodies;
+function computeActiveBodies(system: SystemDefinition): CelestialBodyData[] {
+  return [...system.bodies, ...EXTRA_DWARF_PLANETS, ...SPACE_PROBES, ...COMETS];
 }
 
 export const useSimStore = create<SimStore>((set, get) => ({
@@ -121,7 +127,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
   showHeliosphere: true,
   showAsteroidBelt: true,
   showKuiperBelt: true,
-  showOortCloud: false,
+  showOortCloud: true,
   showProbeModels: false,
   showSelectionIndicator: false,
   showEclipticPlane: true,
@@ -130,8 +136,8 @@ export const useSimStore = create<SimStore>((set, get) => ({
   leftPanelOpen: true,
   rightPanelOpen: true,
 
-  activeBodies: SOLAR_SYSTEM.bodies,
-  bodyMap: buildBodyMap(SOLAR_SYSTEM.bodies),
+  activeBodies: computeActiveBodies(SOLAR_SYSTEM),
+  bodyMap: buildBodyMap(computeActiveBodies(SOLAR_SYSTEM)),
   bodyStates: new Map(),
   orbitPaths: new Map(),
 
@@ -205,38 +211,9 @@ export const useSimStore = create<SimStore>((set, get) => ({
   toggleEclipticPlane: () => set((s) => ({ showEclipticPlane: !s.showEclipticPlane })),
   toggleFullOrbits: () => set((s) => ({ showFullOrbits: !s.showFullOrbits })),
 
-  toggleShowProbes: () => {
-    const { system, showProbes, showDwarfPlanets, showComets } = get();
-    const newShow = !showProbes;
-    const newBodies = computeActiveBodies(system, newShow, showDwarfPlanets, showComets);
-    const newMap = buildBodyMap(newBodies);
-    const orbitPaths = precomputeAllOrbits(newBodies);
-    const bodyStates = computeAllPositions(get().simTime, newBodies, system.centerBodyId);
-    clearTrailCache();
-    set({ showProbes: newShow, activeBodies: newBodies, bodyMap: newMap, orbitPaths, bodyStates });
-  },
-
-  toggleShowDwarfPlanets: () => {
-    const { system, showProbes, showDwarfPlanets, showComets } = get();
-    const newShow = !showDwarfPlanets;
-    const newBodies = computeActiveBodies(system, showProbes, newShow, showComets);
-    const newMap = buildBodyMap(newBodies);
-    const orbitPaths = precomputeAllOrbits(newBodies);
-    const bodyStates = computeAllPositions(get().simTime, newBodies, system.centerBodyId);
-    clearTrailCache();
-    set({ showDwarfPlanets: newShow, activeBodies: newBodies, bodyMap: newMap, orbitPaths, bodyStates });
-  },
-
-  toggleShowComets: () => {
-    const { system, showProbes, showDwarfPlanets, showComets } = get();
-    const newShow = !showComets;
-    const newBodies = computeActiveBodies(system, showProbes, showDwarfPlanets, newShow);
-    const newMap = buildBodyMap(newBodies);
-    const orbitPaths = precomputeAllOrbits(newBodies);
-    const bodyStates = computeAllPositions(get().simTime, newBodies, system.centerBodyId);
-    clearTrailCache();
-    set({ showComets: newShow, activeBodies: newBodies, bodyMap: newMap, orbitPaths, bodyStates });
-  },
+  toggleShowProbes: () => set((s) => ({ showProbes: !s.showProbes })),
+  toggleShowDwarfPlanets: () => set((s) => ({ showDwarfPlanets: !s.showDwarfPlanets })),
+  toggleShowComets: () => set((s) => ({ showComets: !s.showComets })),
 
   setSpeed: (speed: number) => set({ speed }),
 
@@ -295,7 +272,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
 
   init: (system?: SystemDefinition) => {
     const sys = system ?? SOLAR_SYSTEM;
-    const bodies = computeActiveBodies(sys, get().showProbes, get().showDwarfPlanets, get().showComets);
+    const bodies = computeActiveBodies(sys);
     const bMap = buildBodyMap(bodies);
     const orbitPaths = precomputeAllOrbits(bodies);
     const startTime = currentDaysSinceJ2000();

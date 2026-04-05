@@ -12,8 +12,7 @@ export const BODY_DESCRIPTIONS: Record<string, string> = {
     "Earth's sister in size but a runaway greenhouse hell. Venus's thick CO\u2082 atmosphere traps heat so effectively that its surface reaches 465\u00b0C, hot enough to melt lead and making it the hottest planet in the solar system.",
   earth:
     "The only known world with life. Earth has liquid water oceans, a protective magnetosphere, and a breathable nitrogen-oxygen atmosphere. Its axial tilt gives us seasons, and a single large moon stabilizes its rotation.",
-  mars:
-    "The Red Planet owes its color to iron oxide dust covering its surface. Once warmer and wetter, Mars now hosts the tallest volcano (Olympus Mons) and deepest canyon (Valles Marineris) in the solar system, and is the prime target for human exploration.",
+  mars: "The Red Planet owes its color to iron oxide dust covering its surface. Once warmer and wetter, Mars now hosts the tallest volcano (Olympus Mons) and deepest canyon (Valles Marineris) in the solar system, and is the prime target for human exploration.",
   jupiter:
     "The solar system's largest planet \u2014 a gas giant more than twice the mass of all other planets combined. Its Great Red Spot is a storm larger than Earth that has raged for at least 400 years, and its strong gravity shields inner planets from many comets.",
   saturn:
@@ -28,8 +27,7 @@ export const BODY_DESCRIPTIONS: Record<string, string> = {
     "Once the ninth planet, Pluto was reclassified as a dwarf planet in 2006. NASA's New Horizons revealed in 2015 that it's a surprisingly active world with nitrogen glaciers, water-ice mountains, and a possible subsurface ocean.",
   ceres:
     "The largest object in the asteroid belt and closest dwarf planet to the Sun, Ceres contains about a third of the belt's total mass. The Dawn spacecraft found bright salt deposits pointing to a briny subsurface ocean in its past.",
-  eris:
-    "One of the largest known dwarf planets, Eris lies far beyond Pluto in the scattered disc. Its discovery in 2005 directly triggered the redefinition of \"planet\" that demoted Pluto from the main lineup.",
+  eris: 'One of the largest known dwarf planets, Eris lies far beyond Pluto in the scattered disc. Its discovery in 2005 directly triggered the redefinition of "planet" that demoted Pluto from the main lineup.',
   haumea:
     "A strangely elongated dwarf planet spinning so fast \u2014 a day of just four hours \u2014 that it's stretched into an egg shape. It has a thin ring system and two small known moons.",
   makemake:
@@ -37,7 +35,7 @@ export const BODY_DESCRIPTIONS: Record<string, string> = {
   sedna:
     "One of the most distant known objects in the solar system, Sedna follows an extreme 11,400-year elliptical orbit that never brings it closer than 76 AU to the Sun. Its deep red color makes it one of the reddest objects in the solar system, and its detached orbit hints at gravitational influence from an unseen massive body.",
   "2012-vp113":
-    "Nicknamed \"Biden\" after its VP designation, 2012 VP₁₁₃ is a distant inner Oort Cloud object with a perihelion of ~80 AU — so far that it never interacts with the known giant planets. Along with Sedna, its unusual orbit is a key piece of evidence in the search for a hypothetical Planet Nine.",
+    'Nicknamed "Biden" after its VP designation, 2012 VP₁₁₃ is a distant inner Oort Cloud object with a perihelion of ~80 AU — so far that it never interacts with the known giant planets. Along with Sedna, its unusual orbit is a key piece of evidence in the search for a hypothetical Planet Nine.',
 
   // Moons
   moon: "Earth's only natural satellite, formed ~4.5 billion years ago from debris left by a giant impact. Its gravitational pull drives Earth's tides, and its stable orbit keeps Earth's rotation axis from wobbling chaotically.",

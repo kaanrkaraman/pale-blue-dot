@@ -1,18 +1,18 @@
 import {
-  AU_KM,
   ASTEROID_BELT_INNER_KM,
   ASTEROID_BELT_OUTER_KM,
+  AU_KM,
+  HELIOPAUSE_KM,
+  HELIOSPHERE_NOSE_LONGITUDE_DEG,
+  JUPITER_RING_INNER_KM,
+  JUPITER_RING_OUTER_KM,
   KUIPER_BELT_INNER_KM,
   KUIPER_BELT_OUTER_KM,
   OORT_CLOUD_INNER_KM,
   OORT_CLOUD_OUTER_KM,
-  HELIOPAUSE_KM,
-  HELIOSPHERE_NOSE_LONGITUDE_DEG,
-  TERMINATION_SHOCK_KM,
-  JUPITER_RING_INNER_KM,
-  JUPITER_RING_OUTER_KM,
   SATURN_RING_INNER_KM,
   SATURN_RING_OUTER_KM,
+  TERMINATION_SHOCK_KM,
 } from "../core/data";
 import type { BodyState, CameraState, CelestialBodyData } from "../core/types";
 import { worldToScreen } from "./camera";
@@ -300,7 +300,8 @@ function resolveLabels(
     }
 
     const radiusPx = getDisplayRadius(body, camera.kmPerPixel, humanEyeScale);
-    const fontSize = body.type === "star" ? 12 : body.type === "moon" ? 9 : (body.type === "probe" || body.type === "comet") ? 9 : 11;
+    const fontSize =
+      body.type === "star" ? 12 : body.type === "moon" ? 9 : body.type === "probe" || body.type === "comet" ? 9 : 11;
 
     ctx.font = `${fontSize}px ${font}`;
     const textWidth = ctx.measureText(body.name).width;
@@ -464,7 +465,7 @@ function drawHeliosphere(
     const aPx = a / camera.kmPerPixel;
     const cPx = c / camera.kmPerPixel;
 
-    if (aPx < 10 || aPx > width * 30) continue;
+    if (aPx < 10 || aPx > width * 80) continue;
 
     const tailAngle = noseAngle + Math.PI;
     const centerX = sunScreen.x + cPx * Math.cos(tailAngle);
@@ -522,7 +523,17 @@ export function renderScene(
   showFullOrbits: boolean = false,
   orbitPaths?: Map<string, { bodyId: string; points: import("../core/types").Vec2[] }>,
   showOortCloud: boolean = false,
+  showProbes: boolean = true,
+  showDwarfPlanets: boolean = true,
+  showComets: boolean = true,
 ): void {
+  const visibleBodies = bodies.filter((b) => {
+    if (b.type === "probe") return showProbes;
+    if (b.type === "dwarf-planet") return showDwarfPlanets;
+    if (b.type === "comet") return showComets;
+    return true;
+  });
+
   if (immersiveBackground) {
     drawImmersiveBackground(ctx, width, height);
   } else {
@@ -535,8 +546,13 @@ export function renderScene(
 
   if (showAsteroidBelt) {
     drawBelt(
-      ctx, width, height, camera, sunPos,
-      ASTEROID_BELT_INNER_KM, ASTEROID_BELT_OUTER_KM,
+      ctx,
+      width,
+      height,
+      camera,
+      sunPos,
+      ASTEROID_BELT_INNER_KM,
+      ASTEROID_BELT_OUTER_KM,
       "rgba(160, 140, 100, 0.06)",
       "rgba(160, 140, 100, 0.2)",
       "Asteroid Belt",
@@ -546,8 +562,13 @@ export function renderScene(
 
   if (showKuiperBelt) {
     drawBelt(
-      ctx, width, height, camera, sunPos,
-      KUIPER_BELT_INNER_KM, KUIPER_BELT_OUTER_KM,
+      ctx,
+      width,
+      height,
+      camera,
+      sunPos,
+      KUIPER_BELT_INNER_KM,
+      KUIPER_BELT_OUTER_KM,
       "rgba(100, 140, 180, 0.05)",
       "rgba(100, 140, 180, 0.18)",
       "Kuiper Belt",
@@ -557,8 +578,13 @@ export function renderScene(
 
   if (showOortCloud) {
     drawBelt(
-      ctx, width, height, camera, sunPos,
-      OORT_CLOUD_INNER_KM, OORT_CLOUD_OUTER_KM,
+      ctx,
+      width,
+      height,
+      camera,
+      sunPos,
+      OORT_CLOUD_INNER_KM,
+      OORT_CLOUD_OUTER_KM,
       "rgba(80, 100, 140, 0.06)",
       "rgba(80, 100, 140, 0.18)",
       "Oort Cloud",
@@ -571,7 +597,7 @@ export function renderScene(
   }
 
   if (showFullOrbits && orbitPaths) {
-    for (const body of bodies) {
+    for (const body of visibleBodies) {
       if (!body.orbit || body.orbit.eccentricity >= 1.0) continue;
       if (!isOrbitVisible(body.orbit, camera.kmPerPixel, width)) continue;
 
@@ -600,9 +626,12 @@ export function renderScene(
     }
   }
 
-  for (const body of bodies) {
+  for (const body of visibleBodies) {
     if (!body.orbit) continue;
     if (!isOrbitVisible(body.orbit, camera.kmPerPixel, width)) continue;
+
+    const state = bodyStates.get(body.id);
+    if (!state) continue;
 
     const parentId = body.parentId ?? bodies[0]?.id ?? "sun";
     const parentState = bodyStates.get(parentId);
@@ -614,32 +643,69 @@ export function renderScene(
     const trailPoints = computeTrailPointsCached(body, simTime, clipRadius);
 
     const bodyRgb = hexToRgb(body.color);
-    const baseRgb = (body.type === "probe" || body.type === "comet") ? TRAIL_PROBE_RGB : body.type === "moon" ? TRAIL_MOON_RGB : TRAIL_PLANET_RGB;
+    const baseRgb =
+      body.type === "probe" || body.type === "comet"
+        ? TRAIL_PROBE_RGB
+        : body.type === "moon"
+          ? TRAIL_MOON_RGB
+          : TRAIL_PLANET_RGB;
     const r = Math.round(bodyRgb.r * 0.4 + baseRgb.r * 0.6);
     const g = Math.round(bodyRgb.g * 0.4 + baseRgb.g * 0.6);
     const b = Math.round(bodyRgb.b * 0.4 + baseRgb.b * 0.6);
 
-    const maxAlpha = body.type === "moon" ? 0.35 : (body.type === "probe" || body.type === "comet") ? 0.45 : 0.5;
-    const lineWidth = body.type === "moon" ? 0.8 : (body.type === "probe" || body.type === "comet") ? 1.0 : 1.2;
+    const maxAlpha = body.type === "moon" ? 0.35 : body.type === "probe" || body.type === "comet" ? 0.45 : 0.5;
+    const lineWidth = body.type === "moon" ? 0.8 : body.type === "probe" || body.type === "comet" ? 1.0 : 1.2;
 
-    drawTrail(ctx, trailPoints, parentScreen.x, parentScreen.y, camera.kmPerPixel, r, g, b, maxAlpha, lineWidth);
+    const relPos = {
+      x: state.position.x - parentState.position.x,
+      y: state.position.y - parentState.position.y,
+    };
+
+    drawTrail(
+      ctx,
+      trailPoints,
+      parentScreen.x,
+      parentScreen.y,
+      camera.kmPerPixel,
+      r,
+      g,
+      b,
+      maxAlpha,
+      lineWidth,
+      relPos,
+    );
   }
 
-  // Planetary rings drawn before bodies so planet disk overlays inner ring
   const jupiterState = bodyStates.get("jupiter");
   if (jupiterState) {
     const jScreen = worldToScreen(jupiterState.position, camera, width, height);
-    drawPlanetaryRing(ctx, jScreen.x, jScreen.y, JUPITER_RING_INNER_KM, JUPITER_RING_OUTER_KM, camera.kmPerPixel,
-      "rgba(180, 160, 120, 0.15)", "rgba(180, 160, 120, 0.3)");
+    drawPlanetaryRing(
+      ctx,
+      jScreen.x,
+      jScreen.y,
+      JUPITER_RING_INNER_KM,
+      JUPITER_RING_OUTER_KM,
+      camera.kmPerPixel,
+      "rgba(180, 160, 120, 0.15)",
+      "rgba(180, 160, 120, 0.3)",
+    );
   }
   const saturnState = bodyStates.get("saturn");
   if (saturnState) {
     const sScreen = worldToScreen(saturnState.position, camera, width, height);
-    drawPlanetaryRing(ctx, sScreen.x, sScreen.y, SATURN_RING_INNER_KM, SATURN_RING_OUTER_KM, camera.kmPerPixel,
-      "rgba(210, 190, 140, 0.2)", "rgba(210, 190, 140, 0.35)");
+    drawPlanetaryRing(
+      ctx,
+      sScreen.x,
+      sScreen.y,
+      SATURN_RING_INNER_KM,
+      SATURN_RING_OUTER_KM,
+      camera.kmPerPixel,
+      "rgba(210, 190, 140, 0.2)",
+      "rgba(210, 190, 140, 0.35)",
+    );
   }
 
-  for (const body of bodies) {
+  for (const body of visibleBodies) {
     const state = bodyStates.get(body.id);
     if (!state) continue;
 
@@ -666,7 +732,7 @@ export function renderScene(
     }
   }
 
-  const labels = resolveLabels(ctx, bodies, bodyStates, camera, width, height, humanEyeScale, selectedBodyId);
+  const labels = resolveLabels(ctx, visibleBodies, bodyStates, camera, width, height, humanEyeScale, selectedBodyId);
   for (const label of labels) {
     ctx.font = `${label.fontSize}px 'JetBrains Mono', 'Fira Code', monospace`;
     if (label.bodyId === selectedBodyId) {
@@ -712,7 +778,14 @@ export function renderMinimap(
     const sx = cx + state.position.x * scale;
     const sy = cy - state.position.y * scale;
 
-    const dotSize = body.type === "star" ? 3 : (body.type === "probe" || body.type === "comet") ? 1 : body.type === "dwarf-planet" ? 1 : 1.5;
+    const dotSize =
+      body.type === "star"
+        ? 3
+        : body.type === "probe" || body.type === "comet"
+          ? 1
+          : body.type === "dwarf-planet"
+            ? 1
+            : 1.5;
     ctx.fillStyle = body.id === selectedBodyId ? "#6496ff" : body.color;
     ctx.beginPath();
     ctx.arc(sx, sy, dotSize, 0, Math.PI * 2);

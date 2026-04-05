@@ -1,16 +1,16 @@
-import { useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { useSimStore } from "../store";
+import { useState } from "react";
 import { computeAllPositions3D } from "../core/simulation3d";
 import type { BodyState3D } from "../core/types3d";
+import { useSimStore } from "../store";
+import { AsteroidBelt3D, KuiperBelt3D, OortCloud3D, PlanetaryRings3D } from "./Belts3D";
 import { Bodies3D } from "./Bodies3D";
-import { OrbitLines3D } from "./OrbitLines3D";
-import { Labels3D } from "./Labels3D";
-import { Starfield3D } from "./Starfield3D";
+import { CameraController } from "./CameraController";
 import { EclipticGrid } from "./EclipticGrid";
 import { Heliosphere3D } from "./Heliosphere3D";
-import { AsteroidBelt3D, KuiperBelt3D, OortCloud3D, PlanetaryRings3D } from "./Belts3D";
-import { CameraController } from "./CameraController";
+import { Labels3D } from "./Labels3D";
+import { OrbitLines3D } from "./OrbitLines3D";
+import { Starfield3D } from "./Starfield3D";
 
 function SceneContent() {
   const [bodyStates3D, setBodyStates3D] = useState<Map<string, BodyState3D>>(new Map());
@@ -21,17 +21,16 @@ function SceneContent() {
   const showOortCloud = useSimStore((s) => s.showOortCloud);
   const showEclipticPlane = useSimStore((s) => s.showEclipticPlane);
   const showProbeModels = useSimStore((s) => s.showProbeModels);
+  const showProbes = useSimStore((s) => s.showProbes);
+  const showDwarfPlanets = useSimStore((s) => s.showDwarfPlanets);
+  const showComets = useSimStore((s) => s.showComets);
 
   useFrame((_, delta) => {
     const dtSec = Math.min(delta, 0.1);
     tick(dtSec);
 
     const state = useSimStore.getState();
-    const newStates = computeAllPositions3D(
-      state.simTime,
-      state.activeBodies,
-      state.system.centerBodyId,
-    );
+    const newStates = computeAllPositions3D(state.simTime, state.activeBodies, state.system.centerBodyId);
     setBodyStates3D(newStates);
   });
 
@@ -45,9 +44,25 @@ function SceneContent() {
       {showOortCloud && <OortCloud3D />}
       {showHeliosphere && <Heliosphere3D />}
       <PlanetaryRings3D bodyStates3D={bodyStates3D} />
-      <Bodies3D bodyStates3D={bodyStates3D} showProbeModels={showProbeModels} />
-      <OrbitLines3D bodyStates3D={bodyStates3D} />
-      <Labels3D bodyStates3D={bodyStates3D} />
+      <Bodies3D
+        bodyStates3D={bodyStates3D}
+        showProbeModels={showProbeModels}
+        showProbes={showProbes}
+        showDwarfPlanets={showDwarfPlanets}
+        showComets={showComets}
+      />
+      <OrbitLines3D
+        bodyStates3D={bodyStates3D}
+        showProbes={showProbes}
+        showDwarfPlanets={showDwarfPlanets}
+        showComets={showComets}
+      />
+      <Labels3D
+        bodyStates3D={bodyStates3D}
+        showProbes={showProbes}
+        showDwarfPlanets={showDwarfPlanets}
+        showComets={showComets}
+      />
       <CameraController bodyStates3D={bodyStates3D} />
     </>
   );

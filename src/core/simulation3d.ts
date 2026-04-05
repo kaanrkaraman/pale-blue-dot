@@ -1,11 +1,6 @@
+import { solveKepler, solveKeplerHyperbolic, trueAnomalyFromEccentric, trueAnomalyFromHyperbolic } from "./kepler";
 import type { CelestialBodyData, OrbitalElements } from "./types";
 import type { BodyState3D, Vec3 } from "./types3d";
-import {
-  solveKepler,
-  solveKeplerHyperbolic,
-  trueAnomalyFromEccentric,
-  trueAnomalyFromHyperbolic,
-} from "./kepler";
 
 const DEG_TO_RAD = Math.PI / 180;
 const TWO_PI = 2 * Math.PI;
@@ -39,10 +34,7 @@ function orbitalToEcliptic3D(
   return { x, y, z };
 }
 
-function computeOrbitalPosition3D(
-  elements: OrbitalElements,
-  daysSinceEpoch: number,
-): Vec3 {
+function computeOrbitalPosition3D(elements: OrbitalElements, daysSinceEpoch: number): Vec3 {
   const {
     semiMajorAxis: a,
     eccentricity: e,
@@ -132,47 +124,70 @@ export function computeAllPositions3D(
   return states;
 }
 
-export function computeOrbitPath3D(elements: OrbitalElements, numPoints: number): Vec3[] {
-  if (elements.eccentricity >= 1.0) return [];
+export function computeOrbitPath3D(elements: OrbitalElements, numPoints: number): Float32Array {
+  if (elements.eccentricity >= 1.0) return new Float32Array(0);
 
-  const points: Vec3[] = new Array(numPoints);
+  const {
+    semiMajorAxis: a,
+    eccentricity: e,
+    inclination: iDeg,
+    argPerihelion: omegaDeg,
+    longAscNode: OmegaDeg,
+  } = elements;
+
+  const iRad = iDeg * DEG_TO_RAD;
+  const omegaRad = omegaDeg * DEG_TO_RAD;
+  const OmegaRad = OmegaDeg * DEG_TO_RAD;
+  const b = a * Math.sqrt(1 - e * e);
+
+  const points = new Float32Array(numPoints * 3);
   for (let i = 0; i < numPoints; i++) {
-    const t = (i / numPoints) * elements.period;
-    points[i] = computeOrbitalPosition3D(elements, t);
+    const E = (i / numPoints) * TWO_PI;
+    const xOrbital = a * (Math.cos(E) - e);
+    const yOrbital = b * Math.sin(E);
+    const pos = orbitalToEcliptic3D(xOrbital, yOrbital, iRad, omegaRad, OmegaRad);
+    points[i * 3] = pos.x;
+    points[i * 3 + 1] = pos.y;
+    points[i * 3 + 2] = pos.z;
   }
   return points;
 }
 
-export function computeTrailPoints3D(
-  body: CelestialBodyData,
-  simTime: number,
-  maxRadius?: number,
-): Vec3[] {
-  if (!body.orbit) return [];
+const MAX_COMET_TRAIL_DAYS = 50 * 365.25;
+
+function computeTrailPoints3D(body: CelestialBodyData, simTime: number, maxRadius?: number): Float32Array {
+  if (!body.orbit) return new Float32Array(0);
 
   const e = body.orbit.eccentricity;
   const isHyperbolic = e >= 1.0;
+  const isComet = body.type === "comet";
 
   let numSegments: number;
   let trailDuration: number;
 
   if (isHyperbolic || body.type === "probe") {
-    numSegments = 150;
+    numSegments = 250;
     trailDuration = 2000;
   } else if (body.type === "moon") {
-    numSegments = 80;
+    numSegments = 120;
     trailDuration = body.orbit.period * 0.75;
+  } else if (isComet) {
+    numSegments = 1500;
+    trailDuration = Math.min(body.orbit.period * 0.75, MAX_COMET_TRAIL_DAYS);
   } else {
-    numSegments = 200;
+    numSegments = 300;
     trailDuration = body.orbit.period * 0.75;
   }
 
-  const dt = trailDuration / numSegments;
-  const points: Vec3[] = [];
+  const numPoints = numSegments + 1;
+  const points = new Float32Array(numPoints * 3);
   const maxR = maxRadius ?? Number.POSITIVE_INFINITY;
 
-  for (let i = 0; i <= numSegments; i++) {
-    const t = simTime - i * dt;
+  let actualPoints = 0;
+  for (let i = 0; i < numPoints; i++) {
+    const progress = i / numSegments;
+    const biasedProgress = isComet ? progress ** 1.15 : progress;
+    const t = simTime - trailDuration * biasedProgress;
     const position = computeOrbitalPosition3D(body.orbit, t);
 
     if (maxR < Number.POSITIVE_INFINITY) {
@@ -180,8 +195,53 @@ export function computeTrailPoints3D(
       if (r > maxR) break;
     }
 
-    points.push(position);
+    points[i * 3] = position.x;
+    points[i * 3 + 1] = position.y;
+    points[i * 3 + 2] = position.z;
+    actualPoints++;
   }
 
+  return actualPoints === numPoints ? points : points.slice(0, actualPoints * 3);
+}
+
+const trailCache3D = new Map<string, { simTime: number; maxRadius: number | undefined; points: Float32Array }>();
+
+export function computeTrailPoints3DCached(body: CelestialBodyData, simTime: number, maxRadius?: number): Float32Array {
+  const cached = trailCache3D.get(body.id);
+  if (cached && cached.maxRadius === maxRadius) {
+    if (!body.orbit) return new Float32Array(0);
+
+    const e = body.orbit.eccentricity;
+    const isHyperbolic = e >= 1.0;
+    const isComet = body.type === "comet";
+
+    let numSegments: number;
+    let trailDuration: number;
+
+    if (isHyperbolic || body.type === "probe") {
+      numSegments = 250;
+      trailDuration = 2000;
+    } else if (body.type === "moon") {
+      numSegments = 120;
+      trailDuration = body.orbit.period * 0.75;
+    } else if (isComet) {
+      numSegments = 1500;
+      trailDuration = Math.min(body.orbit.period * 0.75, MAX_COMET_TRAIL_DAYS);
+    } else {
+      numSegments = 300;
+      trailDuration = body.orbit.period * 0.75;
+    }
+
+    const threshold = (trailDuration / numSegments) * 0.2;
+    if (Math.abs(simTime - cached.simTime) < threshold) {
+      return cached.points;
+    }
+  }
+  const points = computeTrailPoints3D(body, simTime, maxRadius);
+  trailCache3D.set(body.id, { simTime, maxRadius, points });
   return points;
+}
+
+export function clearTrailCache3D() {
+  trailCache3D.clear();
 }

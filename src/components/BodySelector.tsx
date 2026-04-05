@@ -46,7 +46,7 @@ function BodyItem({
           <span className="toggle-spacer" />
         )}
         <span
-          className={`body-dot ${(body.type === "probe" || body.type === "comet") ? "diamond" : ""}`}
+          className={`body-dot ${body.type === "probe" || body.type === "comet" ? "diamond" : ""}`}
           style={{ backgroundColor: body.color }}
         />
         <span className="body-name">{body.name}</span>
@@ -64,15 +64,7 @@ function BodyItem({
   );
 }
 
-function SectionToggle({
-  title,
-  expanded,
-  onToggle,
-}: {
-  title: string;
-  expanded: boolean;
-  onToggle: () => void;
-}) {
+function SectionToggle({ title, expanded, onToggle }: { title: string; expanded: boolean; onToggle: () => void }) {
   return (
     <div className="body-section-title" onClick={onToggle} style={{ cursor: "pointer" }}>
       <span className="toggle" style={{ display: "inline-block", marginRight: 4 }}>
@@ -152,7 +144,11 @@ export function BodySelector() {
 
         {dwarfPlanets.length > 0 && (
           <>
-            <SectionToggle title="Dwarf Planets" expanded={dwarfPlanetsExpanded} onToggle={() => setDwarfPlanetsExpanded((v) => !v)} />
+            <SectionToggle
+              title="Dwarf Planets"
+              expanded={dwarfPlanetsExpanded}
+              onToggle={() => setDwarfPlanetsExpanded((v) => !v)}
+            />
             <div className={`body-children ${dwarfPlanetsExpanded ? "expanded" : ""}`}>
               <div className="body-children-inner">
                 {dwarfPlanets.map((dp) => (

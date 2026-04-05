@@ -1,13 +1,8 @@
-import * as THREE from "three";
-import { useThree, useFrame } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
+import { useFrame, useThree } from "@react-three/fiber";
 import { useRef, useState } from "react";
-import {
-  TERMINATION_SHOCK_KM,
-  HELIOPAUSE_KM,
-  HELIOSPHERE_NOSE_LONGITUDE_DEG,
-  AU_KM,
-} from "../core/data";
+import * as THREE from "three";
+import { AU_KM, HELIOPAUSE_KM, HELIOSPHERE_NOSE_LONGITUDE_DEG, TERMINATION_SHOCK_KM } from "../core/data";
 import { KM_TO_SCENE } from "./constants";
 
 const DEG_TO_RAD = Math.PI / 180;
@@ -57,7 +52,7 @@ function HelioSphere({ boundary }: { boundary: BoundaryDef }) {
   const offsetX = centerOffset * Math.cos(NOSE_ANGLE + Math.PI);
   const offsetZ = -centerOffset * Math.sin(NOSE_ANGLE + Math.PI);
 
-  const auDist = Math.round(((boundary.noseRadius + boundary.tailRadius) / 2) / AU_KM);
+  const auDist = Math.round((boundary.noseRadius + boundary.tailRadius) / 2 / AU_KM);
   const labelY = semiMinor * 1.05;
 
   useFrame(() => {
@@ -85,10 +80,10 @@ function HelioSphere({ boundary }: { boundary: BoundaryDef }) {
         opacity = 0;
       } else if (ratio < 0.4) {
         opacity = ((ratio - 0.15) / 0.25) * 0.12;
-      } else if (ratio < 1.5) {
+      } else if (ratio < 8) {
         opacity = 0.12;
       } else {
-        opacity = Math.max(0, 0.12 * (1 - (ratio - 1.5) / 2));
+        opacity = Math.max(0, 0.12 * (1 - (ratio - 8) / 4));
       }
       wireMat.current.opacity = opacity;
     }
@@ -96,7 +91,7 @@ function HelioSphere({ boundary }: { boundary: BoundaryDef }) {
     if (labelRef.current) {
       const camDist = camera.position.length();
       const ratio = camDist / semiMinor;
-      const show = ratio > 0.3 && ratio < 3;
+      const show = ratio > 0.3 && ratio < 10;
       labelRef.current.style.opacity = show ? "1" : "0";
     }
   });

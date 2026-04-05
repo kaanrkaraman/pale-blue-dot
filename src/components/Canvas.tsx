@@ -60,6 +60,9 @@ export function Canvas() {
         state.showFullOrbits,
         state.orbitPaths,
         state.showOortCloud,
+        state.showProbes,
+        state.showDwarfPlanets,
+        state.showComets,
       );
 
       animFrameRef.current = requestAnimationFrame(loop);

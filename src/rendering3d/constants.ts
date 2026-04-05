@@ -9,11 +9,7 @@ export const KM_TO_SCENE = 1 / 1_000_000;
  * Three.js: X-right, Y-up, Z-toward-camera (negative forward)
  */
 export function toThreePos(pos: Vec3): [number, number, number] {
-  return [
-    pos.x * KM_TO_SCENE,
-    pos.z * KM_TO_SCENE,
-    -pos.y * KM_TO_SCENE,
-  ];
+  return [pos.x * KM_TO_SCENE, pos.z * KM_TO_SCENE, -pos.y * KM_TO_SCENE];
 }
 
 export function toThreeRadius(radiusKm: number, minSceneUnits = 0): number {

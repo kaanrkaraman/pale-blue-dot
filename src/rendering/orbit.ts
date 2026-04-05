@@ -4,12 +4,14 @@ import type { CelestialBodyData, OrbitalElements, OrbitPath, Vec2 } from "../cor
 const PLANET_ORBIT_POINTS = 360;
 const MOON_ORBIT_POINTS = 120;
 
-const PLANET_TRAIL_SEGMENTS = 200;
-const MOON_TRAIL_SEGMENTS = 80;
-const PROBE_TRAIL_SEGMENTS = 150;
+const PLANET_TRAIL_SEGMENTS = 300;
+const MOON_TRAIL_SEGMENTS = 120;
+const PROBE_TRAIL_SEGMENTS = 250;
+const COMET_TRAIL_SEGMENTS = 1500;
 
 const TRAIL_FRACTION = 0.75;
 const HYPERBOLIC_TRAIL_DAYS = 2000;
+const MAX_COMET_TRAIL_DAYS = 50 * 365.25; // 50 years
 
 export function precomputeAllOrbits(bodies: CelestialBodyData[]): Map<string, OrbitPath> {
   const orbits = new Map<string, OrbitPath>();
@@ -17,8 +19,20 @@ export function precomputeAllOrbits(bodies: CelestialBodyData[]): Map<string, Or
   for (const body of bodies) {
     if (!body.orbit) continue;
 
-    const numPoints = body.type === "moon" ? MOON_ORBIT_POINTS : PLANET_ORBIT_POINTS;
-    const points = computeOrbitPath(body.orbit, numPoints);
+    // Use significantly more points for highly eccentric orbits to keep them smooth
+    let numPoints = body.type === "moon" ? MOON_ORBIT_POINTS : PLANET_ORBIT_POINTS;
+    const e = body.orbit.eccentricity;
+    if (e > 0.98) numPoints *= 8;
+    else if (e > 0.9) numPoints *= 4;
+    else if (e > 0.7) numPoints *= 2;
+
+    const points = new Float64Array(numPoints * 2);
+    for (let i = 0; i < numPoints; i++) {
+      const t = (i / numPoints) * body.orbit.period;
+      const { position } = computeOrbitalPosition(body.orbit, t);
+      points[i * 2] = position.x;
+      points[i * 2 + 1] = position.y;
+    }
 
     orbits.set(body.id, { bodyId: body.id, points });
   }
@@ -26,11 +40,12 @@ export function precomputeAllOrbits(bodies: CelestialBodyData[]): Map<string, Or
   return orbits;
 }
 
-function computeTrailPoints(body: CelestialBodyData, simTime: number, maxRadius?: number): Vec2[] {
-  if (!body.orbit) return [];
+function computeTrailPoints(body: CelestialBodyData, simTime: number, maxRadius?: number): Float64Array {
+  if (!body.orbit) return new Float64Array(0);
 
   const e = body.orbit.eccentricity;
   const isHyperbolic = e >= 1.0;
+  const isComet = body.type === "comet";
 
   let numSegments: number;
   let trailDuration: number;
@@ -41,17 +56,24 @@ function computeTrailPoints(body: CelestialBodyData, simTime: number, maxRadius?
   } else if (body.type === "moon") {
     numSegments = MOON_TRAIL_SEGMENTS;
     trailDuration = body.orbit.period * TRAIL_FRACTION;
+  } else if (isComet) {
+    numSegments = COMET_TRAIL_SEGMENTS;
+    trailDuration = Math.min(body.orbit.period * TRAIL_FRACTION, MAX_COMET_TRAIL_DAYS);
   } else {
     numSegments = PLANET_TRAIL_SEGMENTS;
     trailDuration = body.orbit.period * TRAIL_FRACTION;
   }
 
-  const dt = trailDuration / numSegments;
-  const points: Vec2[] = [];
+  const numPoints = numSegments + 1;
+  const points = new Float64Array(numPoints * 2);
   const maxR = maxRadius ?? Infinity;
 
-  for (let i = 0; i <= numSegments; i++) {
-    const t = simTime - i * dt;
+  let actualPoints = 0;
+  for (let i = 0; i < numPoints; i++) {
+    const progress = i / numSegments;
+    const biasedProgress = isComet ? progress ** 1.15 : progress;
+    const t = simTime - trailDuration * biasedProgress;
+
     const { position } = computeOrbitalPosition(body.orbit, t);
 
     if (maxR < Infinity) {
@@ -59,36 +81,45 @@ function computeTrailPoints(body: CelestialBodyData, simTime: number, maxRadius?
       if (r > maxR) break;
     }
 
-    points.push(position);
+    points[i * 2] = position.x;
+    points[i * 2 + 1] = position.y;
+    actualPoints++;
   }
 
-  return points;
+  return actualPoints === numPoints ? points : points.slice(0, actualPoints * 2);
 }
 
-const trailCache = new Map<string, { simTime: number; maxRadius: number | undefined; points: Vec2[] }>();
+const trailCache = new Map<string, { simTime: number; maxRadius: number | undefined; points: Float64Array }>();
 
-export function computeTrailPointsCached(body: CelestialBodyData, simTime: number, maxRadius?: number): Vec2[] {
+export function computeTrailPointsCached(body: CelestialBodyData, simTime: number, maxRadius?: number): Float64Array {
   const cached = trailCache.get(body.id);
   if (cached && cached.maxRadius === maxRadius) {
-    const e = body.orbit?.eccentricity ?? 0;
+    if (!body.orbit) return new Float64Array(0);
+
+    const e = body.orbit.eccentricity;
     const isHyperbolic = e >= 1.0;
-    let trailDuration: number;
+    const isComet = body.type === "comet";
+
     let numSegments: number;
+    let trailDuration: number;
+
     if (isHyperbolic || body.type === "probe") {
       numSegments = PROBE_TRAIL_SEGMENTS;
       trailDuration = HYPERBOLIC_TRAIL_DAYS;
     } else if (body.type === "moon") {
       numSegments = MOON_TRAIL_SEGMENTS;
-      trailDuration = (body.orbit?.period ?? 27) * TRAIL_FRACTION;
+      trailDuration = body.orbit.period * TRAIL_FRACTION;
+    } else if (isComet) {
+      numSegments = COMET_TRAIL_SEGMENTS;
+      trailDuration = Math.min(body.orbit.period * TRAIL_FRACTION, MAX_COMET_TRAIL_DAYS);
     } else {
       numSegments = PLANET_TRAIL_SEGMENTS;
-      trailDuration = (body.orbit?.period ?? 365) * TRAIL_FRACTION;
+      trailDuration = body.orbit.period * TRAIL_FRACTION;
     }
-    // Recompute only when simTime has advanced by at least one segment
-    const threshold = trailDuration / numSegments;
+
+    const threshold = (trailDuration / numSegments) * 0.2;
     if (Math.abs(simTime - cached.simTime) < threshold) {
-      return cached.points;
-    }
+      return cached.points;    }
   }
   const points = computeTrailPoints(body, simTime, maxRadius);
   trailCache.set(body.id, { simTime, maxRadius, points });
@@ -101,7 +132,7 @@ export function clearTrailCache() {
 
 export function drawTrail(
   ctx: CanvasRenderingContext2D,
-  points: Vec2[],
+  points: Float64Array,
   parentScreenX: number,
   parentScreenY: number,
   kmPerPixel: number,
@@ -110,27 +141,41 @@ export function drawTrail(
   b: number,
   maxAlpha: number,
   lineWidth: number = 1.2,
+  currentBodyPos?: Vec2,
 ): void {
-  if (points.length < 2) return;
+  const numPoints = points.length / 2;
+  if (numPoints < 1 && !currentBodyPos) return;
 
   ctx.lineWidth = lineWidth;
   ctx.lineCap = "round";
 
-  const total = points.length - 1;
   const invKm = 1 / kmPerPixel;
   let lastQuantized = -1;
 
-  for (let i = 0; i < total; i++) {
-    const progress = i / total;
+  let startX = 0;
+  let startY = 0;
+  let hasTip = false;
+
+  if (currentBodyPos) {
+    startX = parentScreenX + currentBodyPos.x * invKm;
+    startY = parentScreenY - currentBodyPos.y * invKm;
+    hasTip = true;
+  } else if (numPoints >= 1) {
+    startX = parentScreenX + points[0] * invKm;
+    startY = parentScreenY - points[1] * invKm;
+  }
+
+  const totalSegments = numPoints + (hasTip ? 0 : -1);
+
+  for (let i = 0; i < numPoints; i++) {
+    const progress = i / (numPoints || 1);
     const alpha = maxAlpha * (1 - progress) ** 1.5;
     if (alpha < 0.005) break;
 
-    // Quantize alpha to reduce draw calls from ~200 to ~10-15
     const quantized = Math.round(alpha * 40) / 40;
 
-    const p0 = points[i];
-    const x0 = parentScreenX + p0.x * invKm;
-    const y0 = parentScreenY - p0.y * invKm;
+    const x0 = i === 0 && hasTip ? startX : parentScreenX + points[i * 2] * invKm;
+    const y0 = i === 0 && hasTip ? startY : parentScreenY - points[i * 2 + 1] * invKm;
 
     if (quantized !== lastQuantized) {
       if (lastQuantized >= 0) ctx.stroke();
@@ -140,15 +185,15 @@ export function drawTrail(
       lastQuantized = quantized;
     }
 
-    const p1 = points[i + 1];
-    ctx.lineTo(parentScreenX + p1.x * invKm, parentScreenY - p1.y * invKm);
+    if (i < numPoints - 1) {
+      ctx.lineTo(parentScreenX + points[(i + 1) * 2] * invKm, parentScreenY - points[(i + 1) * 2 + 1] * invKm);
+    }
   }
 
   if (lastQuantized >= 0) ctx.stroke();
 }
 
 export function isOrbitVisible(elements: OrbitalElements, kmPerPixel: number, canvasWidth: number): boolean {
-  // For hyperbolic orbits, use perihelion distance as representative size
   const representativeRadius =
     elements.eccentricity >= 1.0
       ? Math.abs(elements.semiMajorAxis) * (elements.eccentricity - 1)

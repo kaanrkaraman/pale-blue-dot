@@ -1,9 +1,9 @@
-import { useRef, useEffect, useCallback } from "react";
-import { useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
+import { useFrame, useThree } from "@react-three/fiber";
+import { useCallback, useEffect, useRef } from "react";
 import * as THREE from "three";
-import { useSimStore } from "../store";
 import type { BodyState3D } from "../core/types3d";
+import { useSimStore } from "../store";
 import { toThreePos } from "./constants";
 
 // Expose a zoom function for external UI (ZoomControls buttons)
@@ -19,21 +19,26 @@ export function CameraController({ bodyStates3D }: { bodyStates3D: Map<string, B
   const prevSelectedRef = useRef(selectedBodyId);
   const { camera } = useThree();
 
-  const handleZoom = useCallback((delta: number) => {
-    if (!controlsRef.current) return;
-    const target = controlsRef.current.target as THREE.Vector3;
-    const dir = camera.position.clone().sub(target);
-    const factor = delta > 0 ? 1.25 : 0.8; // zoom out : zoom in
-    dir.multiplyScalar(factor);
-    const newDist = dir.length();
-    if (newDist < 0.01 || newDist > 20_000_000) return;
-    camera.position.copy(target.clone().add(dir));
-    controlsRef.current.update();
-  }, [camera]);
+  const handleZoom = useCallback(
+    (delta: number) => {
+      if (!controlsRef.current) return;
+      const target = controlsRef.current.target as THREE.Vector3;
+      const dir = camera.position.clone().sub(target);
+      const factor = delta > 0 ? 1.25 : 0.8; // zoom out : zoom in
+      dir.multiplyScalar(factor);
+      const newDist = dir.length();
+      if (newDist < 0.01 || newDist > 20_000_000) return;
+      camera.position.copy(target.clone().add(dir));
+      controlsRef.current.update();
+    },
+    [camera],
+  );
 
   useEffect(() => {
     _zoomFn = handleZoom;
-    return () => { _zoomFn = null; };
+    return () => {
+      _zoomFn = null;
+    };
   }, [handleZoom]);
 
   useEffect(() => {

@@ -660,7 +660,6 @@ export const CELESTIAL_BODIES: CelestialBodyData[] = [
       discoveryYear: 1978,
     },
   },
-
 ];
 
 export const EXTRA_DWARF_PLANETS: CelestialBodyData[] = [
@@ -1019,7 +1018,7 @@ export const COMETS: CelestialBodyData[] = [
       eccentricity: 0.96714,
       inclination: 162.2627,
       argPerihelion: 111.3325,
-      longAscNode: 58.4200,
+      longAscNode: 58.42,
       meanAnomalyEpoch: 66.43,
       period: 27509.5,
     },
@@ -1074,7 +1073,7 @@ export const COMETS: CelestialBodyData[] = [
       semiMajorAxis: 518_050_800,
       eccentricity: 0.64102,
       inclination: 7.0402,
-      argPerihelion: 12.780,
+      argPerihelion: 12.78,
       longAscNode: 50.147,
       meanAnomalyEpoch: 336.36,
       period: 2354.0,
@@ -1129,7 +1128,7 @@ export const COMETS: CelestialBodyData[] = [
     orbit: {
       semiMajorAxis: 27_824_322_000,
       eccentricity: 0.99508,
-      inclination: 89.430,
+      inclination: 89.43,
       argPerihelion: 130.591,
       longAscNode: 282.471,
       meanAnomalyEpoch: 0.393,

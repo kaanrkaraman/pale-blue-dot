@@ -1,5 +1,5 @@
-import { useRef, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
+import { useMemo, useRef } from "react";
 import * as THREE from "three";
 
 const GRID_LINES = 40; // lines in each direction from center

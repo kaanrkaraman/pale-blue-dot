@@ -1,6 +1,6 @@
 import { useCallback } from "react";
-import { useSimStore } from "../store";
 import { zoom3D } from "../rendering3d/CameraController";
+import { useSimStore } from "../store";
 
 export function ZoomControls() {
   const applyZoomDelta = useSimStore((s) => s.applyZoomDelta);

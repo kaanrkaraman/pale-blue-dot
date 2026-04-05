@@ -96,21 +96,16 @@ export function computeOrbitalPosition(
   let r: number;
 
   if (e >= 1.0) {
-    // === HYPERBOLIC ORBIT ===
-    // a is negative, mu is required
-    const muVal = mu ?? 1.32712440018e11; // fallback to Sun's GM
+    const muVal = mu ?? 1.32712440018e11;
     const absA = Math.abs(a);
-    // Mean motion in rad/s, then convert to rad/day
     const nRadPerSec = Math.sqrt(muVal / (absA * absA * absA));
     const nRadPerDay = nRadPerSec * SECONDS_PER_DAY;
-
     const M = M0Rad + nRadPerDay * daysSinceEpoch;
+
     const H = solveKeplerHyperbolic(M, e);
     nu = trueAnomalyFromHyperbolic(H, e);
-    // r = |a| * (e * cosh(H) - 1) for hyperbolic
     r = absA * (e * Math.cosh(H) - 1);
   } else {
-    // === ELLIPTICAL ORBIT ===
     const n = TWO_PI / period;
     const M = M0Rad + n * daysSinceEpoch;
     const E = solveKepler(M, e);
@@ -156,17 +151,15 @@ export function computeOrbitPath(elements: OrbitalElements, numPoints: number): 
 }
 
 export function orbitalVelocity(elements: OrbitalElements, r?: number): number {
-  const { semiMajorAxis: a, eccentricity: e, period, mu } = elements;
+  const { semiMajorAxis: a, eccentricity: e, mu } = elements;
+  const muVal = mu ?? 1.32712440018e11;
 
   if (e >= 1.0) {
-    // v = sqrt(mu * (2/r + 1/|a|))
-    const muVal = mu ?? 1.32712440018e11;
     const absA = Math.abs(a);
     const rVal = r ?? absA * (e - 1);
     return Math.sqrt(muVal * (2 / rVal + 1 / absA));
   }
 
-  const circumference = TWO_PI * a * Math.sqrt(1 - e ** 2);
-  const periodSeconds = period * SECONDS_PER_DAY;
-  return circumference / periodSeconds;
+  const rVal = r ?? a;
+  return Math.sqrt(muVal * (2 / rVal - 1 / a));
 }

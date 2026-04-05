@@ -1,5 +1,5 @@
-import { useRef, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
+import { useMemo, useRef } from "react";
 import * as THREE from "three";
 
 export function Starfield3D() {
@@ -21,11 +21,11 @@ export function Starfield3D() {
 
     // Star color palette (same distribution as 2D)
     const starColors: [number, number, number][] = [
-      [0.75, 0.85, 1.0],   // blue-white
-      [1.0, 0.95, 0.85],   // warm white
-      [1.0, 0.82, 0.62],   // yellow
-      [0.65, 0.75, 1.0],   // blue
-      [1.0, 0.7, 0.5],     // orange
+      [0.75, 0.85, 1.0], // blue-white
+      [1.0, 0.95, 0.85], // warm white
+      [1.0, 0.82, 0.62], // yellow
+      [0.65, 0.75, 1.0], // blue
+      [1.0, 0.7, 0.5], // orange
     ];
 
     for (let i = 0; i < count; i++) {
