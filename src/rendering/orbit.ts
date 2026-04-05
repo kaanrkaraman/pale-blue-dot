@@ -11,7 +11,6 @@ const PROBE_TRAIL_SEGMENTS = 150;
 const TRAIL_FRACTION = 0.75;
 const HYPERBOLIC_TRAIL_DAYS = 2000;
 
-/** Hyperbolic orbits (e >= 1) get empty arrays; use trails instead. */
 export function precomputeAllOrbits(bodies: CelestialBodyData[]): Map<string, OrbitPath> {
   const orbits = new Map<string, OrbitPath>();
 
@@ -27,8 +26,7 @@ export function precomputeAllOrbits(bodies: CelestialBodyData[]): Map<string, Or
   return orbits;
 }
 
-/** Returns parent-centric positions from newest (index 0) to oldest. */
-export function computeTrailPoints(body: CelestialBodyData, simTime: number, maxRadius?: number): Vec2[] {
+function computeTrailPoints(body: CelestialBodyData, simTime: number, maxRadius?: number): Vec2[] {
   if (!body.orbit) return [];
 
   const e = body.orbit.eccentricity;
@@ -56,7 +54,6 @@ export function computeTrailPoints(body: CelestialBodyData, simTime: number, max
     const t = simTime - i * dt;
     const { position } = computeOrbitalPosition(body.orbit, t);
 
-    // Clip points beyond max radius for hyperbolic orbits
     if (maxR < Infinity) {
       const r = Math.sqrt(position.x ** 2 + position.y ** 2);
       if (r > maxR) break;
@@ -68,7 +65,40 @@ export function computeTrailPoints(body: CelestialBodyData, simTime: number, max
   return points;
 }
 
-/** Points go from newest (index 0, brightest) to oldest (faded out). */
+const trailCache = new Map<string, { simTime: number; maxRadius: number | undefined; points: Vec2[] }>();
+
+export function computeTrailPointsCached(body: CelestialBodyData, simTime: number, maxRadius?: number): Vec2[] {
+  const cached = trailCache.get(body.id);
+  if (cached && cached.maxRadius === maxRadius) {
+    const e = body.orbit?.eccentricity ?? 0;
+    const isHyperbolic = e >= 1.0;
+    let trailDuration: number;
+    let numSegments: number;
+    if (isHyperbolic || body.type === "probe") {
+      numSegments = PROBE_TRAIL_SEGMENTS;
+      trailDuration = HYPERBOLIC_TRAIL_DAYS;
+    } else if (body.type === "moon") {
+      numSegments = MOON_TRAIL_SEGMENTS;
+      trailDuration = (body.orbit?.period ?? 27) * TRAIL_FRACTION;
+    } else {
+      numSegments = PLANET_TRAIL_SEGMENTS;
+      trailDuration = (body.orbit?.period ?? 365) * TRAIL_FRACTION;
+    }
+    // Recompute only when simTime has advanced by at least one segment
+    const threshold = trailDuration / numSegments;
+    if (Math.abs(simTime - cached.simTime) < threshold) {
+      return cached.points;
+    }
+  }
+  const points = computeTrailPoints(body, simTime, maxRadius);
+  trailCache.set(body.id, { simTime, maxRadius, points });
+  return points;
+}
+
+export function clearTrailCache() {
+  trailCache.clear();
+}
+
 export function drawTrail(
   ctx: CanvasRenderingContext2D,
   points: Vec2[],
@@ -87,27 +117,34 @@ export function drawTrail(
   ctx.lineCap = "round";
 
   const total = points.length - 1;
+  const invKm = 1 / kmPerPixel;
+  let lastQuantized = -1;
 
   for (let i = 0; i < total; i++) {
-    const p0 = points[i];
-    const p1 = points[i + 1];
-
     const progress = i / total;
     const alpha = maxAlpha * (1 - progress) ** 1.5;
-
     if (alpha < 0.005) break;
 
-    const x0 = parentScreenX + p0.x / kmPerPixel;
-    const y0 = parentScreenY - p0.y / kmPerPixel;
-    const x1 = parentScreenX + p1.x / kmPerPixel;
-    const y1 = parentScreenY - p1.y / kmPerPixel;
+    // Quantize alpha to reduce draw calls from ~200 to ~10-15
+    const quantized = Math.round(alpha * 40) / 40;
 
-    ctx.beginPath();
-    ctx.moveTo(x0, y0);
-    ctx.lineTo(x1, y1);
-    ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
-    ctx.stroke();
+    const p0 = points[i];
+    const x0 = parentScreenX + p0.x * invKm;
+    const y0 = parentScreenY - p0.y * invKm;
+
+    if (quantized !== lastQuantized) {
+      if (lastQuantized >= 0) ctx.stroke();
+      ctx.beginPath();
+      ctx.strokeStyle = `rgba(${r},${g},${b},${quantized})`;
+      ctx.moveTo(x0, y0);
+      lastQuantized = quantized;
+    }
+
+    const p1 = points[i + 1];
+    ctx.lineTo(parentScreenX + p1.x * invKm, parentScreenY - p1.y * invKm);
   }
+
+  if (lastQuantized >= 0) ctx.stroke();
 }
 
 export function isOrbitVisible(elements: OrbitalElements, kmPerPixel: number, canvasWidth: number): boolean {

@@ -1,10 +1,6 @@
 import { computeOrbitalPosition, orbitalVelocity } from "./kepler";
 import type { BodyState, CelestialBodyData, Vec2 } from "./types";
 
-/**
- * Compute all body positions at a given simulation time (Julian days since J2000).
- * Bodies must be in dependency order (parents before children).
- */
 export function computeAllPositions(
   daysSinceEpoch: number,
   bodies: CelestialBodyData[],

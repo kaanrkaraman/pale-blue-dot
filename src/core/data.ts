@@ -12,7 +12,6 @@ export const MU_SUN = 1.32712440018e11;
 /** Gravitational constant in km^3 / (kg * s^2) */
 export const G_KM3 = 6.6743e-20;
 
-/** Current days since J2000 epoch */
 export function currentDaysSinceJ2000(): number {
   const j2000Ms = Date.UTC(2000, 0, 1, 12, 0, 0);
   return (Date.now() - j2000Ms) / 86_400_000;
@@ -28,12 +27,46 @@ export const TERMINATION_SHOCK_KM = TERMINATION_SHOCK_AU * AU_KM;
 export const HELIOPAUSE_AU = 120;
 export const HELIOPAUSE_KM = HELIOPAUSE_AU * AU_KM;
 
-/**
- * Direction of the heliosphere nose (apex of Sun's motion through ISM).
- * Ecliptic longitude ~255°, latitude ~5°.
- * The heliosphere is compressed on the nose side and elongated on the tail side.
- */
+// Ecliptic longitude of heliosphere nose (~255°, compressed side)
 export const HELIOSPHERE_NOSE_LONGITUDE_DEG = 255;
+
+// ===== Oort Cloud =====
+
+/** Inner edge of the Oort Cloud (~2,000 AU) */
+export const OORT_CLOUD_INNER_AU = 2_000;
+export const OORT_CLOUD_INNER_KM = OORT_CLOUD_INNER_AU * AU_KM;
+
+/** Outer edge of the Oort Cloud (~100,000 AU, ~1.58 light-years) */
+export const OORT_CLOUD_OUTER_AU = 100_000;
+export const OORT_CLOUD_OUTER_KM = OORT_CLOUD_OUTER_AU * AU_KM;
+
+// ===== Asteroid Belt =====
+
+/** Inner edge of the main asteroid belt (~2.06 AU) */
+export const ASTEROID_BELT_INNER_AU = 2.06;
+export const ASTEROID_BELT_INNER_KM = ASTEROID_BELT_INNER_AU * AU_KM;
+
+/** Outer edge of the main asteroid belt (~3.27 AU) */
+export const ASTEROID_BELT_OUTER_AU = 3.27;
+export const ASTEROID_BELT_OUTER_KM = ASTEROID_BELT_OUTER_AU * AU_KM;
+
+// ===== Kuiper Belt =====
+
+/** Inner edge of the Kuiper Belt (~30 AU, roughly Neptune's orbit) */
+export const KUIPER_BELT_INNER_AU = 30;
+export const KUIPER_BELT_INNER_KM = KUIPER_BELT_INNER_AU * AU_KM;
+
+/** Outer edge of the Kuiper Belt (~50 AU) */
+export const KUIPER_BELT_OUTER_AU = 50;
+export const KUIPER_BELT_OUTER_KM = KUIPER_BELT_OUTER_AU * AU_KM;
+
+export const JUPITER_RING_INNER_KM = 122_500;
+export const JUPITER_RING_OUTER_KM = 229_000;
+export const JUPITER_RADIUS_KM = 69_911;
+
+export const SATURN_RING_INNER_KM = 66_900;
+export const SATURN_RING_OUTER_KM = 140_180;
+export const SATURN_RADIUS_KM = 58_232;
 
 export function buildBodyMap(bodies: CelestialBodyData[]): ReadonlyMap<string, CelestialBodyData> {
   return new Map(bodies.map((b) => [b.id, b]));
@@ -43,11 +76,7 @@ export function getChildrenFrom(bodies: CelestialBodyData[], parentId: string): 
   return bodies.filter((b) => b.parentId === parentId);
 }
 
-/**
- * All celestial bodies with real astronomical data.
- * Orbital elements are J2000 epoch values.
- * Sources: NASA JPL, IAU
- */
+// Orbital elements: J2000 epoch. Sources: NASA JPL, IAU
 export const CELESTIAL_BODIES: CelestialBodyData[] = [
   {
     id: "sun",
@@ -56,6 +85,11 @@ export const CELESTIAL_BODIES: CelestialBodyData[] = [
     radius: 696_340,
     mass: 1.989e30,
     color: "#FDB813",
+    details: {
+      meanTemperature: 5_778,
+      rotationPeriod: 609.12, // ~25.38 days at equator
+      axialTilt: 7.25,
+    },
   },
 
   {
@@ -75,6 +109,12 @@ export const CELESTIAL_BODIES: CelestialBodyData[] = [
       meanAnomalyEpoch: 174.796,
       period: 87.969,
     },
+    details: {
+      meanTemperature: 440,
+      rotationPeriod: 1407.6,
+      axialTilt: 0.034,
+      knownMoons: 0,
+    },
   },
   {
     id: "venus",
@@ -92,6 +132,12 @@ export const CELESTIAL_BODIES: CelestialBodyData[] = [
       longAscNode: 76.68,
       meanAnomalyEpoch: 50.115,
       period: 224.701,
+    },
+    details: {
+      meanTemperature: 737,
+      rotationPeriod: -5832.5, // retrograde
+      axialTilt: 177.36,
+      knownMoons: 0,
     },
   },
   {
@@ -111,6 +157,12 @@ export const CELESTIAL_BODIES: CelestialBodyData[] = [
       meanAnomalyEpoch: 358.617,
       period: 365.256,
     },
+    details: {
+      meanTemperature: 288,
+      rotationPeriod: 23.934,
+      axialTilt: 23.44,
+      knownMoons: 1,
+    },
   },
   {
     id: "mars",
@@ -128,6 +180,12 @@ export const CELESTIAL_BODIES: CelestialBodyData[] = [
       longAscNode: 49.558,
       meanAnomalyEpoch: 19.373,
       period: 686.971,
+    },
+    details: {
+      meanTemperature: 210,
+      rotationPeriod: 24.623,
+      axialTilt: 25.19,
+      knownMoons: 2,
     },
   },
   {
@@ -147,6 +205,12 @@ export const CELESTIAL_BODIES: CelestialBodyData[] = [
       meanAnomalyEpoch: 20.02,
       period: 4332.59,
     },
+    details: {
+      meanTemperature: 165,
+      rotationPeriod: 9.925,
+      axialTilt: 3.13,
+      knownMoons: 95,
+    },
   },
   {
     id: "saturn",
@@ -164,6 +228,12 @@ export const CELESTIAL_BODIES: CelestialBodyData[] = [
       longAscNode: 113.665,
       meanAnomalyEpoch: 317.02,
       period: 10_759.22,
+    },
+    details: {
+      meanTemperature: 134,
+      rotationPeriod: 10.656,
+      axialTilt: 26.73,
+      knownMoons: 146,
     },
   },
   {
@@ -183,6 +253,12 @@ export const CELESTIAL_BODIES: CelestialBodyData[] = [
       meanAnomalyEpoch: 142.238,
       period: 30_688.5,
     },
+    details: {
+      meanTemperature: 76,
+      rotationPeriod: -17.24, // retrograde
+      axialTilt: 97.77,
+      knownMoons: 28,
+    },
   },
   {
     id: "neptune",
@@ -200,6 +276,12 @@ export const CELESTIAL_BODIES: CelestialBodyData[] = [
       longAscNode: 131.784,
       meanAnomalyEpoch: 256.228,
       period: 60_182.0,
+    },
+    details: {
+      meanTemperature: 72,
+      rotationPeriod: 16.11,
+      axialTilt: 28.32,
+      knownMoons: 16,
     },
   },
   {
@@ -219,8 +301,14 @@ export const CELESTIAL_BODIES: CelestialBodyData[] = [
       meanAnomalyEpoch: 14.53,
       period: 90_560.0,
     },
+    details: {
+      meanTemperature: 44,
+      rotationPeriod: -153.293, // retrograde
+      axialTilt: 122.53,
+      knownMoons: 5,
+      discoveryYear: 1930,
+    },
   },
-
   {
     id: "moon",
     name: "Moon",
@@ -237,6 +325,11 @@ export const CELESTIAL_BODIES: CelestialBodyData[] = [
       longAscNode: 125.08,
       meanAnomalyEpoch: 135.27,
       period: 27.322,
+    },
+    details: {
+      meanTemperature: 220,
+      rotationPeriod: 655.73, // tidally locked
+      axialTilt: 6.68,
     },
   },
 
@@ -257,6 +350,11 @@ export const CELESTIAL_BODIES: CelestialBodyData[] = [
       meanAnomalyEpoch: 91.059,
       period: 0.3189,
     },
+    details: {
+      meanTemperature: 233,
+      rotationPeriod: 7.654, // tidally locked
+      discoveryYear: 1877,
+    },
   },
   {
     id: "deimos",
@@ -274,6 +372,11 @@ export const CELESTIAL_BODIES: CelestialBodyData[] = [
       longAscNode: 339.6,
       meanAnomalyEpoch: 325.0,
       period: 1.2624,
+    },
+    details: {
+      meanTemperature: 233,
+      rotationPeriod: 30.3, // tidally locked
+      discoveryYear: 1877,
     },
   },
 
@@ -294,6 +397,11 @@ export const CELESTIAL_BODIES: CelestialBodyData[] = [
       meanAnomalyEpoch: 342.021,
       period: 1.7691,
     },
+    details: {
+      meanTemperature: 110,
+      rotationPeriod: 42.459, // tidally locked
+      discoveryYear: 1610,
+    },
   },
   {
     id: "europa",
@@ -311,6 +419,11 @@ export const CELESTIAL_BODIES: CelestialBodyData[] = [
       longAscNode: 219.106,
       meanAnomalyEpoch: 171.016,
       period: 3.5512,
+    },
+    details: {
+      meanTemperature: 102,
+      rotationPeriod: 85.228, // tidally locked
+      discoveryYear: 1610,
     },
   },
   {
@@ -330,6 +443,11 @@ export const CELESTIAL_BODIES: CelestialBodyData[] = [
       meanAnomalyEpoch: 317.54,
       period: 7.1546,
     },
+    details: {
+      meanTemperature: 110,
+      rotationPeriod: 171.71, // tidally locked
+      discoveryYear: 1610,
+    },
   },
   {
     id: "callisto",
@@ -347,6 +465,11 @@ export const CELESTIAL_BODIES: CelestialBodyData[] = [
       longAscNode: 298.848,
       meanAnomalyEpoch: 181.408,
       period: 16.689,
+    },
+    details: {
+      meanTemperature: 134,
+      rotationPeriod: 400.54, // tidally locked
+      discoveryYear: 1610,
     },
   },
 
@@ -367,6 +490,11 @@ export const CELESTIAL_BODIES: CelestialBodyData[] = [
       meanAnomalyEpoch: 120.0,
       period: 15.945,
     },
+    details: {
+      meanTemperature: 94,
+      rotationPeriod: 382.68, // tidally locked
+      discoveryYear: 1655,
+    },
   },
   {
     id: "enceladus",
@@ -385,6 +513,11 @@ export const CELESTIAL_BODIES: CelestialBodyData[] = [
       meanAnomalyEpoch: 200.0,
       period: 1.3702,
     },
+    details: {
+      meanTemperature: 75,
+      rotationPeriod: 32.885, // tidally locked
+      discoveryYear: 1789,
+    },
   },
   {
     id: "mimas",
@@ -402,6 +535,11 @@ export const CELESTIAL_BODIES: CelestialBodyData[] = [
       longAscNode: 173.0,
       meanAnomalyEpoch: 14.0,
       period: 0.9424,
+    },
+    details: {
+      meanTemperature: 64,
+      rotationPeriod: 22.618, // tidally locked
+      discoveryYear: 1789,
     },
   },
 
@@ -422,6 +560,11 @@ export const CELESTIAL_BODIES: CelestialBodyData[] = [
       meanAnomalyEpoch: 24.614,
       period: 8.7059,
     },
+    details: {
+      meanTemperature: 70,
+      rotationPeriod: 208.94, // tidally locked
+      discoveryYear: 1787,
+    },
   },
   {
     id: "oberon",
@@ -440,6 +583,11 @@ export const CELESTIAL_BODIES: CelestialBodyData[] = [
       meanAnomalyEpoch: 283.088,
       period: 13.4632,
     },
+    details: {
+      meanTemperature: 75,
+      rotationPeriod: 323.12, // tidally locked
+      discoveryYear: 1787,
+    },
   },
   {
     id: "miranda",
@@ -457,6 +605,11 @@ export const CELESTIAL_BODIES: CelestialBodyData[] = [
       longAscNode: 326.438,
       meanAnomalyEpoch: 311.33,
       period: 1.4135,
+    },
+    details: {
+      meanTemperature: 59,
+      rotationPeriod: 33.924, // tidally locked
+      discoveryYear: 1948,
     },
   },
 
@@ -477,6 +630,11 @@ export const CELESTIAL_BODIES: CelestialBodyData[] = [
       meanAnomalyEpoch: 264.775,
       period: 5.877,
     },
+    details: {
+      meanTemperature: 38,
+      rotationPeriod: -141.048, // retrograde, tidally locked
+      discoveryYear: 1846,
+    },
   },
 
   {
@@ -496,19 +654,229 @@ export const CELESTIAL_BODIES: CelestialBodyData[] = [
       meanAnomalyEpoch: 147.848,
       period: 6.3872,
     },
+    details: {
+      meanTemperature: 53,
+      rotationPeriod: 153.294, // tidally locked (mutually with Pluto)
+      discoveryYear: 1978,
+    },
+  },
+
+];
+
+export const EXTRA_DWARF_PLANETS: CelestialBodyData[] = [
+  {
+    id: "ceres",
+    name: "Ceres",
+    type: "dwarf-planet",
+    radius: 473,
+    mass: 9.393e20,
+    color: "#8C8A85",
+    parentId: "sun",
+    orbit: {
+      semiMajorAxis: 413_690_000,
+      eccentricity: 0.0758,
+      inclination: 10.594,
+      argPerihelion: 73.597,
+      longAscNode: 80.329,
+      meanAnomalyEpoch: 77.372,
+      period: 1_681.63,
+    },
+    details: {
+      meanTemperature: 168,
+      rotationPeriod: 9.074,
+      axialTilt: 4.0,
+      knownMoons: 0,
+      discoveryYear: 1801,
+    },
+  },
+  {
+    id: "eris",
+    name: "Eris",
+    type: "dwarf-planet",
+    radius: 1_163,
+    mass: 1.66e22,
+    color: "#D4CFC7",
+    parentId: "sun",
+    orbit: {
+      semiMajorAxis: 10_125_000_000,
+      eccentricity: 0.4407,
+      inclination: 44.04,
+      argPerihelion: 151.639,
+      longAscNode: 35.877,
+      meanAnomalyEpoch: 205.989,
+      period: 204_199.0,
+    },
+    details: {
+      meanTemperature: 42,
+      rotationPeriod: 25.9,
+      axialTilt: 78.0,
+      knownMoons: 1,
+      discoveryYear: 2005,
+    },
+  },
+  {
+    id: "haumea",
+    name: "Haumea",
+    type: "dwarf-planet",
+    radius: 816,
+    mass: 4.006e21,
+    color: "#E8E0D0",
+    parentId: "sun",
+    orbit: {
+      semiMajorAxis: 6_452_000_000,
+      eccentricity: 0.1912,
+      inclination: 28.19,
+      argPerihelion: 239.041,
+      longAscNode: 122.167,
+      meanAnomalyEpoch: 218.205,
+      period: 103_774.0,
+    },
+    details: {
+      meanTemperature: 32,
+      rotationPeriod: 3.915,
+      axialTilt: 126.0,
+      knownMoons: 2,
+      discoveryYear: 2004,
+    },
+  },
+  {
+    id: "makemake",
+    name: "Makemake",
+    type: "dwarf-planet",
+    radius: 715,
+    mass: 3.1e21,
+    color: "#D2B48C",
+    parentId: "sun",
+    orbit: {
+      semiMajorAxis: 6_796_000_000,
+      eccentricity: 0.1559,
+      inclination: 28.98,
+      argPerihelion: 297.152,
+      longAscNode: 79.382,
+      meanAnomalyEpoch: 165.514,
+      period: 112_897.0,
+    },
+    details: {
+      meanTemperature: 40,
+      rotationPeriod: 22.827,
+      knownMoons: 1,
+      discoveryYear: 2005,
+    },
+  },
+  {
+    id: "sedna",
+    name: "Sedna",
+    type: "dwarf-planet",
+    radius: 495,
+    mass: 8.3e20,
+    color: "#B07060",
+    parentId: "sun",
+    orbit: {
+      semiMajorAxis: 82_255_000_000,
+      eccentricity: 0.861,
+      inclination: 11.9252,
+      argPerihelion: 310.733,
+      longAscNode: 144.317,
+      meanAnomalyEpoch: 357.901,
+      period: 4_709_313.0,
+    },
+    details: {
+      meanTemperature: 12,
+      rotationPeriod: 10.273,
+      knownMoons: 0,
+      discoveryYear: 2003,
+    },
+  },
+  {
+    id: "2012-vp113",
+    name: "2012 VP₁₁₃",
+    type: "dwarf-planet",
+    radius: 255,
+    mass: 1.0e20,
+    color: "#C4A898",
+    parentId: "sun",
+    orbit: {
+      semiMajorAxis: 41_186_000_000,
+      eccentricity: 0.7075,
+      inclination: 24.0216,
+      argPerihelion: 293.988,
+      longAscNode: 90.893,
+      meanAnomalyEpoch: 1.62,
+      period: 1_668_461.0,
+    },
+    details: {
+      meanTemperature: 15,
+      knownMoons: 0,
+      discoveryYear: 2012,
+    },
+  },
+  {
+    id: "dysnomia",
+    name: "Dysnomia",
+    type: "moon",
+    radius: 350,
+    mass: 8.2e19,
+    color: "#9E9690",
+    parentId: "eris",
+    orbit: {
+      semiMajorAxis: 37_273,
+      eccentricity: 0.0062,
+      inclination: 61.3,
+      argPerihelion: 126.17,
+      longAscNode: 139.5,
+      meanAnomalyEpoch: 178.0,
+      period: 15.774,
+    },
+    details: {
+      meanTemperature: 30,
+      discoveryYear: 2005,
+    },
+  },
+  {
+    id: "hiiaka",
+    name: "Hi'iaka",
+    type: "moon",
+    radius: 160,
+    mass: 1.79e19,
+    color: "#C8C0B8",
+    parentId: "haumea",
+    orbit: {
+      semiMajorAxis: 49_880,
+      eccentricity: 0.0513,
+      inclination: 126.356,
+      argPerihelion: 278.6,
+      longAscNode: 206.766,
+      meanAnomalyEpoch: 150.0,
+      period: 49.462,
+    },
+    details: {
+      discoveryYear: 2005,
+    },
+  },
+  {
+    id: "namaka",
+    name: "Namaka",
+    type: "moon",
+    radius: 85,
+    mass: 1.79e18,
+    color: "#B8B0A8",
+    parentId: "haumea",
+    orbit: {
+      semiMajorAxis: 25_657,
+      eccentricity: 0.249,
+      inclination: 113.013,
+      argPerihelion: 178.9,
+      longAscNode: 205.016,
+      meanAnomalyEpoch: 90.0,
+      period: 18.278,
+    },
+    details: {
+      discoveryYear: 2005,
+    },
   },
 ];
 
-/**
- * Space probes on hyperbolic escape trajectories.
- * Heliocentric osculating elements at J2000 epoch (2000-Jan-01 12:00 TDB).
- * Source: NASA JPL Horizons System (https://ssd.jpl.nasa.gov/horizons/)
- * Query: TABLE_TYPE='ELEMENTS', CENTER='@0', OUT_UNITS='KM-S', REF_PLANE='ECLIPTIC', REF_SYSTEM='J2000'
- *
- * For New Horizons: elements from 2010-Jan-01 epoch, mean anomaly back-propagated
- * to J2000 using n = sqrt(mu/|a|^3). NH launched 2006; positions before ~2007 are
- * mathematical extrapolations of its post-Jupiter-flyby trajectory.
- */
+// Heliocentric osculating elements at J2000 (NASA JPL Horizons)
 export const SPACE_PROBES: CelestialBodyData[] = [
   {
     id: "voyager-1",
@@ -527,6 +895,10 @@ export const SPACE_PROBES: CelestialBodyData[] = [
       meanAnomalyEpoch: 1247.843951044291,
       period: 0,
       mu: MU_SUN,
+    },
+    details: {
+      launchDate: "1977-09-05",
+      status: "Active, in interstellar space",
     },
   },
   {
@@ -547,6 +919,10 @@ export const SPACE_PROBES: CelestialBodyData[] = [
       period: 0,
       mu: MU_SUN,
     },
+    details: {
+      launchDate: "1977-08-20",
+      status: "Active, in interstellar space",
+    },
   },
   {
     id: "pioneer-10",
@@ -566,6 +942,10 @@ export const SPACE_PROBES: CelestialBodyData[] = [
       period: 0,
       mu: MU_SUN,
     },
+    details: {
+      launchDate: "1972-03-03",
+      status: "Signal lost (last contact 2003)",
+    },
   },
   {
     id: "pioneer-11",
@@ -584,6 +964,10 @@ export const SPACE_PROBES: CelestialBodyData[] = [
       meanAnomalyEpoch: 311.3510674255978,
       period: 0,
       mu: MU_SUN,
+    },
+    details: {
+      launchDate: "1973-04-06",
+      status: "Signal lost (last contact 1995)",
     },
   },
   {
@@ -606,6 +990,183 @@ export const SPACE_PROBES: CelestialBodyData[] = [
       meanAnomalyEpoch: -162.83,
       period: 0,
       mu: MU_SUN,
+    },
+    details: {
+      launchDate: "2006-01-19",
+      status: "Active, in Kuiper Belt",
+    },
+  },
+];
+
+// Heliocentric osculating elements at J2000 (JPL Horizons / MPC)
+export const COMETS: CelestialBodyData[] = [
+  {
+    // 1P/Halley — last perihelion 1986-02-09, next ~2061-07-28
+    // JPL solution: epoch 1994-02-17 (JD 2449401.5), back-propagated to J2000
+    // a = 17.83414 AU, M at epoch = 38.384°
+    // offset to J2000 = 2451545.0 - 2449401.5 = 2143.5 days
+    // n = 360 / 27509.5 = 0.013086 deg/day
+    // M0_J2000 = 38.384 + 0.013086 * 2143.5 = 66.43°
+    id: "halley",
+    name: "1P/Halley",
+    type: "comet",
+    radius: 5.5,
+    mass: 2.2e14,
+    color: "#88CCFF",
+    parentId: "sun",
+    orbit: {
+      semiMajorAxis: 2_667_950_710,
+      eccentricity: 0.96714,
+      inclination: 162.2627,
+      argPerihelion: 111.3325,
+      longAscNode: 58.4200,
+      meanAnomalyEpoch: 66.43,
+      period: 27509.5,
+    },
+    details: {
+      discoveryYear: -239,
+      lastPerihelion: "1986-02-09",
+      nextPerihelion: "~2061-07-28",
+    },
+  },
+  {
+    // 2P/Encke — short period comet, a = 2.21526 AU
+    // JPL epoch 2000-10-16 (JD 2451833.5)
+    // M at epoch = 228.16°, offset = 2451545.0 - 2451833.5 = -288.5 days
+    // n = 360 / 1204.3 = 0.29893 deg/day
+    // M0_J2000 = 228.16 + 0.29893 * (-288.5) = 141.89°
+    id: "encke",
+    name: "2P/Encke",
+    type: "comet",
+    radius: 2.4,
+    mass: 7.0e13,
+    color: "#FFD080",
+    parentId: "sun",
+    orbit: {
+      semiMajorAxis: 331_375_360,
+      eccentricity: 0.8483,
+      inclination: 11.782,
+      argPerihelion: 186.546,
+      longAscNode: 334.572,
+      meanAnomalyEpoch: 141.89,
+      period: 1204.3,
+    },
+    details: {
+      discoveryYear: 1786,
+      lastPerihelion: "2023-10-22",
+      nextPerihelion: "~2027-02-11",
+    },
+  },
+  {
+    // 67P/Churyumov-Gerasimenko — Rosetta target, a = 3.4630 AU
+    // JPL epoch 2002-08-06 (JD 2452493.0)
+    // M at epoch = 121.35°, offset = 2451545.0 - 2452493.0 = -948.0 days
+    // n = 360 / 2354.0 = 0.15293 deg/day
+    // M0_J2000 = 121.35 + 0.15293 * (-948.0) = -23.64° → 336.36°
+    id: "67p",
+    name: "67P/Churyumov-Gerasimenko",
+    type: "comet",
+    radius: 2.0,
+    mass: 9.982e12,
+    color: "#AA9977",
+    parentId: "sun",
+    orbit: {
+      semiMajorAxis: 518_050_800,
+      eccentricity: 0.64102,
+      inclination: 7.0402,
+      argPerihelion: 12.780,
+      longAscNode: 50.147,
+      meanAnomalyEpoch: 336.36,
+      period: 2354.0,
+    },
+    details: {
+      discoveryYear: 1969,
+      lastPerihelion: "2021-11-02",
+      nextPerihelion: "~2028-04-12",
+    },
+  },
+  {
+    // 46P/Wirtanen — short period, a = 3.0924 AU
+    // JPL epoch 2018-12-12 (JD 2458465.5)
+    // M at epoch = 359.23°, offset = 2451545.0 - 2458465.5 = -6920.5 days
+    // n = 360 / 1985.9 = 0.18127 deg/day
+    // M0_J2000 = 359.23 + 0.18127 * (-6920.5) = -894.8° mod 360 = 185.2°
+    id: "wirtanen",
+    name: "46P/Wirtanen",
+    type: "comet",
+    radius: 0.6,
+    mass: 2.0e13,
+    color: "#66CCAA",
+    parentId: "sun",
+    orbit: {
+      semiMajorAxis: 462_590_200,
+      eccentricity: 0.65898,
+      inclination: 11.747,
+      argPerihelion: 356.341,
+      longAscNode: 82.162,
+      meanAnomalyEpoch: 185.2,
+      period: 1985.9,
+    },
+    details: {
+      discoveryYear: 1948,
+      lastPerihelion: "2018-12-12",
+      nextPerihelion: "~2024-06-01",
+    },
+  },
+  {
+    // C/1995 O1 (Hale-Bopp) — Great Comet of 1997, a = 186.0 AU
+    // JPL epoch 1997-04-01 (JD 2450539.5), perihelion 1997-04-01
+    // M at epoch ≈ 0° (at perihelion), offset = 2451545.0 - 2450539.5 = 1005.5 days
+    // n = 360 / 920670 = 0.000391 deg/day
+    // M0_J2000 = 0 + 0.000391 * 1005.5 = 0.393°
+    id: "hale-bopp",
+    name: "C/1995 O1 (Hale-Bopp)",
+    type: "comet",
+    radius: 30,
+    mass: 1.0e16,
+    color: "#DDDDFF",
+    parentId: "sun",
+    orbit: {
+      semiMajorAxis: 27_824_322_000,
+      eccentricity: 0.99508,
+      inclination: 89.430,
+      argPerihelion: 130.591,
+      longAscNode: 282.471,
+      meanAnomalyEpoch: 0.393,
+      period: 920670.0,
+    },
+    details: {
+      discoveryYear: 1995,
+      lastPerihelion: "1997-04-01",
+      nextPerihelion: "~4530",
+    },
+  },
+  {
+    // 109P/Swift-Tuttle — source of Perseids, a = 26.092 AU
+    // JPL epoch 1992-12-12 (JD 2448968.5), perihelion 1992-12-12
+    // M at epoch ≈ 0°, offset = 2451545.0 - 2448968.5 = 2576.5 days
+    // n = 360 / 48691 = 0.007393 deg/day
+    // M0_J2000 = 0 + 0.007393 * 2576.5 = 19.04°
+    id: "swift-tuttle",
+    name: "109P/Swift-Tuttle",
+    type: "comet",
+    radius: 13,
+    mass: 5.0e15,
+    color: "#CC88FF",
+    parentId: "sun",
+    orbit: {
+      semiMajorAxis: 3_903_490_000,
+      eccentricity: 0.96323,
+      inclination: 113.454,
+      argPerihelion: 152.982,
+      longAscNode: 139.381,
+      meanAnomalyEpoch: 19.04,
+      period: 48691.0,
+    },
+    details: {
+      discoveryYear: 1862,
+      lastPerihelion: "1992-12-12",
+      nextPerihelion: "~2126-07-12",
     },
   },
 ];

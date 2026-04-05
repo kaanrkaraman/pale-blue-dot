@@ -22,7 +22,7 @@ export interface OrbitalElements {
   mu?: number;
 }
 
-export type BodyType = "star" | "planet" | "dwarf-planet" | "moon" | "probe";
+export type BodyType = "star" | "planet" | "dwarf-planet" | "moon" | "probe" | "comet";
 
 export interface CelestialBodyData {
   id: string;
@@ -35,6 +35,28 @@ export interface CelestialBodyData {
   color: string;
   orbit?: OrbitalElements;
   parentId?: string;
+  details?: BodyDetails;
+}
+
+export interface BodyDetails {
+  /** Kelvin */
+  meanTemperature?: number;
+  /** hours, negative = retrograde rotation */
+  rotationPeriod?: number;
+  /** degrees */
+  axialTilt?: number;
+  /** total known moons (IAU recognized) */
+  knownMoons?: number;
+  /** year of discovery, undefined for bodies known since antiquity */
+  discoveryYear?: number;
+  /** ISO date string for probes */
+  launchDate?: string;
+  /** current mission status for probes */
+  status?: string;
+  /** last perihelion date for comets */
+  lastPerihelion?: string;
+  /** next perihelion date for comets */
+  nextPerihelion?: string;
 }
 
 export interface BodyState {

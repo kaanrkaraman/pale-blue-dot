@@ -44,25 +44,16 @@ export function solveKeplerHyperbolic(meanAnomaly: number, eccentricity: number)
   return H;
 }
 
-/**
- * Compute true anomaly from eccentric anomaly (elliptical)
- */
 export function trueAnomalyFromEccentric(E: number, e: number): number {
   const halfE = E / 2;
   return 2 * Math.atan2(Math.sqrt(1 + e) * Math.sin(halfE), Math.sqrt(1 - e) * Math.cos(halfE));
 }
 
-/**
- * Compute true anomaly from hyperbolic anomaly
- */
 export function trueAnomalyFromHyperbolic(H: number, e: number): number {
   return 2 * Math.atan2(Math.sqrt(e + 1) * Math.sinh(H / 2), Math.sqrt(e - 1) * Math.cosh(H / 2));
 }
 
-/**
- * Rotate a position from the orbital plane to the ecliptic plane (2D projection).
- * This is the standard R_z(Ω) * R_x(i) * R_z(ω) rotation, taking x,y of the result.
- */
+// R_z(Ω) * R_x(i) * R_z(ω) rotation, projected to x,y
 function orbitalToEcliptic(xOrbital: number, yOrbital: number, iRad: number, omegaRad: number, OmegaRad: number): Vec2 {
   const cosOmega = Math.cos(OmegaRad);
   const sinOmega = Math.sin(OmegaRad);
@@ -81,14 +72,6 @@ function orbitalToEcliptic(xOrbital: number, yOrbital: number, iRad: number, ome
   return { x, y };
 }
 
-/**
- * Compute 2D ecliptic-projected position from orbital elements at a given time.
- * Supports both elliptical (e < 1) and hyperbolic (e >= 1) orbits.
- *
- * @param elements - Keplerian orbital elements
- * @param daysSinceEpoch - Julian days since J2000
- * @returns position in km and true anomaly in radians
- */
 export function computeOrbitalPosition(
   elements: OrbitalElements,
   daysSinceEpoch: number,
@@ -143,39 +126,46 @@ export function computeOrbitalPosition(
   return { position, trueAnomaly: nu, orbitalRadius: r };
 }
 
-/**
- * Compute a full orbit path as an array of points (elliptical only).
- * For hyperbolic orbits (e >= 1), returns an empty array.
- */
 export function computeOrbitPath(elements: OrbitalElements, numPoints: number): Vec2[] {
   if (elements.eccentricity >= 1.0) return [];
 
+  const {
+    semiMajorAxis: a,
+    eccentricity: e,
+    inclination: iDeg,
+    argPerihelion: omegaDeg,
+    longAscNode: OmegaDeg,
+  } = elements;
+
+  const iRad = iDeg * DEG_TO_RAD;
+  const omegaRad = omegaDeg * DEG_TO_RAD;
+  const OmegaRad = OmegaDeg * DEG_TO_RAD;
+  const b = a * Math.sqrt(1 - e * e);
+
+  // Sample uniformly in eccentric anomaly E for even geometric distribution.
+  // Uniform-in-time sampling clusters points at aphelion for eccentric orbits,
+  // leaving the perihelion arc angular/boxy.
   const points: Vec2[] = new Array(numPoints);
   for (let i = 0; i < numPoints; i++) {
-    const t = (i / numPoints) * elements.period;
-    const { position } = computeOrbitalPosition(elements, t);
-    points[i] = position;
+    const E = (i / numPoints) * TWO_PI;
+    const xOrbital = a * (Math.cos(E) - e);
+    const yOrbital = b * Math.sin(E);
+    points[i] = orbitalToEcliptic(xOrbital, yOrbital, iRad, omegaRad, OmegaRad);
   }
   return points;
 }
 
-/**
- * Compute orbital velocity in km/s.
- * For elliptical: mean orbital velocity from circumference/period.
- * For hyperbolic: vis-viva equation at a reference distance.
- */
 export function orbitalVelocity(elements: OrbitalElements, r?: number): number {
   const { semiMajorAxis: a, eccentricity: e, period, mu } = elements;
 
   if (e >= 1.0) {
-    // Vis-viva: v = sqrt(mu * (2/r + 1/|a|))
+    // v = sqrt(mu * (2/r + 1/|a|))
     const muVal = mu ?? 1.32712440018e11;
     const absA = Math.abs(a);
     const rVal = r ?? absA * (e - 1);
     return Math.sqrt(muVal * (2 / rVal + 1 / absA));
   }
 
-  // Elliptical: mean velocity
   const circumference = TWO_PI * a * Math.sqrt(1 - e ** 2);
   const periodSeconds = period * SECONDS_PER_DAY;
   return circumference / periodSeconds;

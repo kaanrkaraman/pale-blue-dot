@@ -1,9 +1,10 @@
 import { create } from "zustand";
-import { buildBodyMap, currentDaysSinceJ2000, getChildrenFrom, SOLAR_SYSTEM, SPACE_PROBES } from "../core/data";
+import { buildBodyMap, COMETS, currentDaysSinceJ2000, EXTRA_DWARF_PLANETS, getChildrenFrom, SOLAR_SYSTEM, SPACE_PROBES } from "../core/data";
 import { computeAllPositions } from "../core/simulation";
 import type { BodyState, CameraState, CelestialBodyData, OrbitPath, SystemDefinition } from "../core/types";
+import type { ViewMode } from "../core/types3d";
 import { clampZoom, DEEP_ZOOM_THRESHOLD, getAutoZoomLevel } from "../rendering/camera";
-import { precomputeAllOrbits } from "../rendering/orbit";
+import { clearTrailCache, precomputeAllOrbits } from "../rendering/orbit";
 
 interface SimStore {
   // System
@@ -18,11 +19,23 @@ interface SimStore {
   camera: CameraState;
   selectedBodyId: string;
 
+  // View mode
+  viewMode: ViewMode;
+
   // Settings
   humanEyeScale: boolean;
   immersiveBackground: boolean;
   showProbes: boolean;
+  showDwarfPlanets: boolean;
   showHeliosphere: boolean;
+  showAsteroidBelt: boolean;
+  showKuiperBelt: boolean;
+  showOortCloud: boolean;
+  showProbeModels: boolean;
+  showSelectionIndicator: boolean;
+  showEclipticPlane: boolean;
+  showFullOrbits: boolean;
+  showComets: boolean;
   leftPanelOpen: boolean;
   rightPanelOpen: boolean;
 
@@ -38,17 +51,30 @@ interface SimStore {
   slowDown: () => void;
   selectBody: (id: string) => void;
   applyZoomDelta: (delta: number) => void;
+  toggleViewMode: () => void;
   toggleHumanEyeScale: () => void;
   toggleImmersiveBackground: () => void;
   toggleShowProbes: () => void;
+  toggleShowDwarfPlanets: () => void;
   toggleShowHeliosphere: () => void;
+  toggleAsteroidBelt: () => void;
+  toggleKuiperBelt: () => void;
+  toggleOortCloud: () => void;
+  toggleProbeModels: () => void;
+  toggleSelectionIndicator: () => void;
+  toggleEclipticPlane: () => void;
+  toggleFullOrbits: () => void;
+  toggleShowComets: () => void;
+  setSpeed: (speed: number) => void;
+  resetToNow: () => void;
+  stepTime: (days: number) => void;
   toggleLeftPanel: () => void;
   toggleRightPanel: () => void;
   tick: (dtReal: number) => void;
   init: (system?: SystemDefinition) => void;
 }
 
-const SPEED_STEPS = [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 30, 60, 182.625, 365.25, 730.5, 3652.5, 18262.5, 36525];
+export const SPEED_STEPS = [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 30, 60, 182.625, 365.25, 730.5, 3652.5, 18262.5, 36525];
 
 function findClosestSpeedIndex(speed: number): number {
   let closest = 0;
@@ -63,10 +89,14 @@ function findClosestSpeedIndex(speed: number): number {
   return closest;
 }
 
-const ZOOM_FACTOR = 1.15;
+const ZOOM_FACTOR = 1.1;
 
-function computeActiveBodies(system: SystemDefinition, showProbes: boolean): CelestialBodyData[] {
-  return showProbes ? [...system.bodies, ...SPACE_PROBES] : system.bodies;
+function computeActiveBodies(system: SystemDefinition, showProbes: boolean, showDwarfPlanets: boolean, showComets: boolean): CelestialBodyData[] {
+  let bodies = system.bodies;
+  if (showDwarfPlanets) bodies = [...bodies, ...EXTRA_DWARF_PLANETS];
+  if (showProbes) bodies = [...bodies, ...SPACE_PROBES];
+  if (showComets) bodies = [...bodies, ...COMETS];
+  return bodies;
 }
 
 export const useSimStore = create<SimStore>((set, get) => ({
@@ -82,10 +112,21 @@ export const useSimStore = create<SimStore>((set, get) => ({
   },
   selectedBodyId: SOLAR_SYSTEM.centerBodyId,
 
+  viewMode: "3d",
+
   humanEyeScale: false,
   immersiveBackground: true,
-  showProbes: false,
-  showHeliosphere: false,
+  showProbes: true,
+  showDwarfPlanets: false,
+  showHeliosphere: true,
+  showAsteroidBelt: true,
+  showKuiperBelt: true,
+  showOortCloud: false,
+  showProbeModels: false,
+  showSelectionIndicator: false,
+  showEclipticPlane: true,
+  showFullOrbits: false,
+  showComets: false,
   leftPanelOpen: true,
   rightPanelOpen: true,
 
@@ -152,18 +193,77 @@ export const useSimStore = create<SimStore>((set, get) => ({
     }));
   },
 
+  toggleViewMode: () => set((s) => ({ viewMode: s.viewMode === "2d" ? "3d" : "2d" })),
   toggleHumanEyeScale: () => set((s) => ({ humanEyeScale: !s.humanEyeScale })),
   toggleImmersiveBackground: () => set((s) => ({ immersiveBackground: !s.immersiveBackground })),
   toggleShowHeliosphere: () => set((s) => ({ showHeliosphere: !s.showHeliosphere })),
+  toggleAsteroidBelt: () => set((s) => ({ showAsteroidBelt: !s.showAsteroidBelt })),
+  toggleKuiperBelt: () => set((s) => ({ showKuiperBelt: !s.showKuiperBelt })),
+  toggleOortCloud: () => set((s) => ({ showOortCloud: !s.showOortCloud })),
+  toggleProbeModels: () => set((s) => ({ showProbeModels: !s.showProbeModels })),
+  toggleSelectionIndicator: () => set((s) => ({ showSelectionIndicator: !s.showSelectionIndicator })),
+  toggleEclipticPlane: () => set((s) => ({ showEclipticPlane: !s.showEclipticPlane })),
+  toggleFullOrbits: () => set((s) => ({ showFullOrbits: !s.showFullOrbits })),
 
   toggleShowProbes: () => {
-    const { system, showProbes } = get();
+    const { system, showProbes, showDwarfPlanets, showComets } = get();
     const newShow = !showProbes;
-    const newBodies = computeActiveBodies(system, newShow);
+    const newBodies = computeActiveBodies(system, newShow, showDwarfPlanets, showComets);
     const newMap = buildBodyMap(newBodies);
     const orbitPaths = precomputeAllOrbits(newBodies);
     const bodyStates = computeAllPositions(get().simTime, newBodies, system.centerBodyId);
+    clearTrailCache();
     set({ showProbes: newShow, activeBodies: newBodies, bodyMap: newMap, orbitPaths, bodyStates });
+  },
+
+  toggleShowDwarfPlanets: () => {
+    const { system, showProbes, showDwarfPlanets, showComets } = get();
+    const newShow = !showDwarfPlanets;
+    const newBodies = computeActiveBodies(system, showProbes, newShow, showComets);
+    const newMap = buildBodyMap(newBodies);
+    const orbitPaths = precomputeAllOrbits(newBodies);
+    const bodyStates = computeAllPositions(get().simTime, newBodies, system.centerBodyId);
+    clearTrailCache();
+    set({ showDwarfPlanets: newShow, activeBodies: newBodies, bodyMap: newMap, orbitPaths, bodyStates });
+  },
+
+  toggleShowComets: () => {
+    const { system, showProbes, showDwarfPlanets, showComets } = get();
+    const newShow = !showComets;
+    const newBodies = computeActiveBodies(system, showProbes, showDwarfPlanets, newShow);
+    const newMap = buildBodyMap(newBodies);
+    const orbitPaths = precomputeAllOrbits(newBodies);
+    const bodyStates = computeAllPositions(get().simTime, newBodies, system.centerBodyId);
+    clearTrailCache();
+    set({ showComets: newShow, activeBodies: newBodies, bodyMap: newMap, orbitPaths, bodyStates });
+  },
+
+  setSpeed: (speed: number) => set({ speed }),
+
+  resetToNow: () => {
+    const { activeBodies, system, selectedBodyId } = get();
+    const now = currentDaysSinceJ2000();
+    const bodyStates = computeAllPositions(now, activeBodies, system.centerBodyId);
+    const selected = bodyStates.get(selectedBodyId);
+    const center = selected ? { ...selected.position } : { x: 0, y: 0 };
+    set((s) => ({
+      simTime: now,
+      bodyStates,
+      camera: { ...s.camera, center },
+    }));
+  },
+
+  stepTime: (days: number) => {
+    const { simTime, activeBodies, system, selectedBodyId } = get();
+    const newTime = simTime + days;
+    const bodyStates = computeAllPositions(newTime, activeBodies, system.centerBodyId);
+    const selected = bodyStates.get(selectedBodyId);
+    const center = selected ? { ...selected.position } : get().camera.center;
+    set((s) => ({
+      simTime: newTime,
+      bodyStates,
+      camera: { ...s.camera, center },
+    }));
   },
 
   toggleLeftPanel: () => set((s) => ({ leftPanelOpen: !s.leftPanelOpen })),
@@ -195,7 +295,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
 
   init: (system?: SystemDefinition) => {
     const sys = system ?? SOLAR_SYSTEM;
-    const bodies = computeActiveBodies(sys, get().showProbes);
+    const bodies = computeActiveBodies(sys, get().showProbes, get().showDwarfPlanets, get().showComets);
     const bMap = buildBodyMap(bodies);
     const orbitPaths = precomputeAllOrbits(bodies);
     const startTime = currentDaysSinceJ2000();

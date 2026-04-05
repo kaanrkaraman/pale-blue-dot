@@ -1,7 +1,7 @@
 import type { BodyType, CameraState, Vec2 } from "../core/types";
 
 const MIN_KM_PER_PX = 0.5;
-const MAX_KM_PER_PX = 250_000_000;
+const MAX_KM_PER_PX = 20_000_000_000;
 export const DEEP_ZOOM_THRESHOLD = 25_000_000;
 const ZOOM_FACTOR = 1.15;
 

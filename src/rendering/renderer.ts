@@ -1,7 +1,22 @@
-import { AU_KM, HELIOPAUSE_KM, HELIOSPHERE_NOSE_LONGITUDE_DEG, TERMINATION_SHOCK_KM } from "../core/data";
+import {
+  AU_KM,
+  ASTEROID_BELT_INNER_KM,
+  ASTEROID_BELT_OUTER_KM,
+  KUIPER_BELT_INNER_KM,
+  KUIPER_BELT_OUTER_KM,
+  OORT_CLOUD_INNER_KM,
+  OORT_CLOUD_OUTER_KM,
+  HELIOPAUSE_KM,
+  HELIOSPHERE_NOSE_LONGITUDE_DEG,
+  TERMINATION_SHOCK_KM,
+  JUPITER_RING_INNER_KM,
+  JUPITER_RING_OUTER_KM,
+  SATURN_RING_INNER_KM,
+  SATURN_RING_OUTER_KM,
+} from "../core/data";
 import type { BodyState, CameraState, CelestialBodyData } from "../core/types";
 import { worldToScreen } from "./camera";
-import { computeTrailPoints, drawTrail, isOrbitVisible } from "./orbit";
+import { computeTrailPointsCached, drawTrail, isOrbitVisible } from "./orbit";
 
 const MIN_PLANET_SIZE = 4;
 const MIN_MOON_SIZE = 2.5;
@@ -205,17 +220,22 @@ function getDisplayRadius(body: CelestialBodyData, kmPerPixel: number, humanEyeS
 
   if (body.type === "star") return Math.max(realRadiusPx, MIN_SUN_SIZE);
   if (body.type === "moon") return Math.max(realRadiusPx, MIN_MOON_SIZE);
-  if (body.type === "probe") return Math.max(realRadiusPx, MIN_PROBE_SIZE);
+  if (body.type === "probe" || body.type === "comet") return Math.max(realRadiusPx, MIN_PROBE_SIZE);
   return Math.max(realRadiusPx, MIN_PLANET_SIZE);
 }
 
+const rgbCache = new Map<string, { r: number; g: number; b: number }>();
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  let cached = rgbCache.get(hex);
+  if (cached) return cached;
   const h = hex.replace("#", "");
-  return {
+  cached = {
     r: parseInt(h.substring(0, 2), 16),
     g: parseInt(h.substring(2, 4), 16),
     b: parseInt(h.substring(4, 6), 16),
   };
+  rgbCache.set(hex, cached);
+  return cached;
 }
 
 // ===== Label collision system =====
@@ -280,7 +300,7 @@ function resolveLabels(
     }
 
     const radiusPx = getDisplayRadius(body, camera.kmPerPixel, humanEyeScale);
-    const fontSize = body.type === "star" ? 12 : body.type === "moon" ? 9 : body.type === "probe" ? 9 : 11;
+    const fontSize = body.type === "star" ? 12 : body.type === "moon" ? 9 : (body.type === "probe" || body.type === "comet") ? 9 : 11;
 
     ctx.font = `${fontSize}px ${font}`;
     const textWidth = ctx.measureText(body.name).width;
@@ -300,7 +320,7 @@ function resolveLabels(
       height: fontSize,
       fontSize,
       priority,
-      isProbe: body.type === "probe",
+      isProbe: body.type === "probe" || body.type === "comet",
     });
   }
 
@@ -321,15 +341,93 @@ function resolveLabels(
   return placed;
 }
 
-// ===== Heliosphere rendering =====
+// ===== Belt / boundary rendering =====
 
 const DEG_TO_RAD = Math.PI / 180;
 
-/**
- * Draw the heliosphere boundaries (termination shock and heliopause).
- * Rendered as slightly elongated ellipses: compressed on the nose side
- * (Sun's direction of travel through ISM) and extended on the tail side.
- */
+function drawBelt(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  camera: CameraState,
+  sunPosition: { x: number; y: number },
+  innerRadiusKm: number,
+  outerRadiusKm: number,
+  fillColor: string,
+  strokeColor: string,
+  label: string,
+  labelColor: string,
+): void {
+  const sunScreen = worldToScreen(sunPosition, camera, width, height);
+
+  const innerPx = innerRadiusKm / camera.kmPerPixel;
+  const outerPx = outerRadiusKm / camera.kmPerPixel;
+
+  if (outerPx < 5 || innerPx > Math.max(width, height) * 50) return;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(sunScreen.x, sunScreen.y, outerPx, 0, Math.PI * 2);
+  ctx.arc(sunScreen.x, sunScreen.y, innerPx, 0, Math.PI * 2, true);
+  ctx.fillStyle = fillColor;
+  ctx.fill();
+
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = 0.8;
+  ctx.setLineDash([6, 4]);
+  ctx.beginPath();
+  ctx.arc(sunScreen.x, sunScreen.y, innerPx, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(sunScreen.x, sunScreen.y, outerPx, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+
+  const labelRadiusPx = (innerRadiusKm + outerRadiusKm) / 2 / camera.kmPerPixel;
+  const labelX = sunScreen.x;
+  const labelY = sunScreen.y - labelRadiusPx;
+
+  if (labelY > 0 && labelY < height && labelX > 0 && labelX < width) {
+    ctx.font = "9px 'JetBrains Mono', 'Fira Code', monospace";
+    ctx.fillStyle = labelColor;
+    ctx.textAlign = "center";
+    const innerAU = (innerRadiusKm / AU_KM).toFixed(1);
+    const outerAU = (outerRadiusKm / AU_KM).toFixed(1);
+    ctx.fillText(`${label} (${innerAU}–${outerAU} AU)`, labelX, labelY - 4);
+  }
+}
+
+function drawPlanetaryRing(
+  ctx: CanvasRenderingContext2D,
+  centerX: number,
+  centerY: number,
+  innerRadiusKm: number,
+  outerRadiusKm: number,
+  kmPerPixel: number,
+  fillColor: string,
+  strokeColor: string,
+): void {
+  const innerPx = innerRadiusKm / kmPerPixel;
+  const outerPx = outerRadiusKm / kmPerPixel;
+
+  if (outerPx < 2 || innerPx > 4000) return;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, outerPx, 0, Math.PI * 2);
+  ctx.arc(centerX, centerY, innerPx, 0, Math.PI * 2, true);
+  ctx.fillStyle = fillColor;
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, outerPx, 0, Math.PI * 2);
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = 0.6;
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawHeliosphere(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -339,7 +437,7 @@ function drawHeliosphere(
 ): void {
   const sunScreen = worldToScreen(sunPosition, camera, width, height);
 
-  // Nose direction in ecliptic coordinates (Sun's motion through ISM ~255° ecl. longitude)
+  // Sun's motion through ISM at ~255° ecliptic longitude
   const noseAngle = HELIOSPHERE_NOSE_LONGITUDE_DEG * DEG_TO_RAD;
 
   const boundaries = [
@@ -361,14 +459,13 @@ function drawHeliosphere(
 
   for (const boundary of boundaries) {
     const a = (boundary.noseRadius + boundary.tailRadius) / 2;
-    const c = (boundary.tailRadius - boundary.noseRadius) / 2; // center offset toward tail
+    const c = (boundary.tailRadius - boundary.noseRadius) / 2;
 
     const aPx = a / camera.kmPerPixel;
     const cPx = c / camera.kmPerPixel;
 
     if (aPx < 10 || aPx > width * 30) continue;
 
-    // Offset the ellipse center toward the tail (opposite nose)
     const tailAngle = noseAngle + Math.PI;
     const centerX = sunScreen.x + cPx * Math.cos(tailAngle);
     const centerY = sunScreen.y - cPx * Math.sin(tailAngle);
@@ -413,13 +510,18 @@ export function renderScene(
   camera: CameraState,
   bodyStates: Map<string, BodyState>,
   bodies: CelestialBodyData[],
-  _bodyMap: ReadonlyMap<string, CelestialBodyData>,
   selectedBodyId: string,
   humanEyeScale: boolean,
   simTime: number,
   immersiveBackground: boolean,
   maxOrbitRadius: number,
   showHeliosphere: boolean = false,
+  showAsteroidBelt: boolean = false,
+  showKuiperBelt: boolean = false,
+  showSelectionIndicator: boolean = true,
+  showFullOrbits: boolean = false,
+  orbitPaths?: Map<string, { bodyId: string; points: import("../core/types").Vec2[] }>,
+  showOortCloud: boolean = false,
 ): void {
   if (immersiveBackground) {
     drawImmersiveBackground(ctx, width, height);
@@ -428,10 +530,74 @@ export function renderScene(
     ctx.fillRect(0, 0, width, height);
   }
 
+  const sunState = bodyStates.get(bodies[0]?.id ?? "sun");
+  const sunPos = sunState?.position ?? { x: 0, y: 0 };
+
+  if (showAsteroidBelt) {
+    drawBelt(
+      ctx, width, height, camera, sunPos,
+      ASTEROID_BELT_INNER_KM, ASTEROID_BELT_OUTER_KM,
+      "rgba(160, 140, 100, 0.06)",
+      "rgba(160, 140, 100, 0.2)",
+      "Asteroid Belt",
+      "rgba(160, 140, 100, 0.45)",
+    );
+  }
+
+  if (showKuiperBelt) {
+    drawBelt(
+      ctx, width, height, camera, sunPos,
+      KUIPER_BELT_INNER_KM, KUIPER_BELT_OUTER_KM,
+      "rgba(100, 140, 180, 0.05)",
+      "rgba(100, 140, 180, 0.18)",
+      "Kuiper Belt",
+      "rgba(100, 140, 180, 0.4)",
+    );
+  }
+
+  if (showOortCloud) {
+    drawBelt(
+      ctx, width, height, camera, sunPos,
+      OORT_CLOUD_INNER_KM, OORT_CLOUD_OUTER_KM,
+      "rgba(80, 100, 140, 0.06)",
+      "rgba(80, 100, 140, 0.18)",
+      "Oort Cloud",
+      "rgba(80, 100, 140, 0.45)",
+    );
+  }
+
   if (showHeliosphere) {
-    const sunState = bodyStates.get(bodies[0]?.id ?? "sun");
-    const sunPos = sunState?.position ?? { x: 0, y: 0 };
     drawHeliosphere(ctx, width, height, camera, sunPos);
+  }
+
+  if (showFullOrbits && orbitPaths) {
+    for (const body of bodies) {
+      if (!body.orbit || body.orbit.eccentricity >= 1.0) continue;
+      if (!isOrbitVisible(body.orbit, camera.kmPerPixel, width)) continue;
+
+      const orbitPath = orbitPaths.get(body.id);
+      if (!orbitPath || orbitPath.points.length < 2) continue;
+
+      const parentId = body.parentId ?? bodies[0]?.id ?? "sun";
+      const parentState = bodyStates.get(parentId);
+      if (!parentState) continue;
+
+      const parentScreen = worldToScreen(parentState.position, camera, width, height);
+      const alpha = body.type === "moon" ? 0.15 : 0.2;
+
+      ctx.beginPath();
+      for (let i = 0; i < orbitPath.points.length; i++) {
+        const p = orbitPath.points[i];
+        const x = parentScreen.x + p.x / camera.kmPerPixel;
+        const y = parentScreen.y - p.y / camera.kmPerPixel;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.strokeStyle = `rgba(100, 130, 180, ${alpha})`;
+      ctx.lineWidth = 0.6;
+      ctx.stroke();
+    }
   }
 
   for (const body of bodies) {
@@ -445,18 +611,32 @@ export function renderScene(
     const parentScreen = worldToScreen(parentState.position, camera, width, height);
 
     const clipRadius = body.orbit.eccentricity >= 1.0 ? maxOrbitRadius * 2 : undefined;
-    const trailPoints = computeTrailPoints(body, simTime, clipRadius);
+    const trailPoints = computeTrailPointsCached(body, simTime, clipRadius);
 
     const bodyRgb = hexToRgb(body.color);
-    const baseRgb = body.type === "probe" ? TRAIL_PROBE_RGB : body.type === "moon" ? TRAIL_MOON_RGB : TRAIL_PLANET_RGB;
+    const baseRgb = (body.type === "probe" || body.type === "comet") ? TRAIL_PROBE_RGB : body.type === "moon" ? TRAIL_MOON_RGB : TRAIL_PLANET_RGB;
     const r = Math.round(bodyRgb.r * 0.4 + baseRgb.r * 0.6);
     const g = Math.round(bodyRgb.g * 0.4 + baseRgb.g * 0.6);
     const b = Math.round(bodyRgb.b * 0.4 + baseRgb.b * 0.6);
 
-    const maxAlpha = body.type === "moon" ? 0.35 : body.type === "probe" ? 0.45 : 0.5;
-    const lineWidth = body.type === "moon" ? 0.8 : body.type === "probe" ? 1.0 : 1.2;
+    const maxAlpha = body.type === "moon" ? 0.35 : (body.type === "probe" || body.type === "comet") ? 0.45 : 0.5;
+    const lineWidth = body.type === "moon" ? 0.8 : (body.type === "probe" || body.type === "comet") ? 1.0 : 1.2;
 
     drawTrail(ctx, trailPoints, parentScreen.x, parentScreen.y, camera.kmPerPixel, r, g, b, maxAlpha, lineWidth);
+  }
+
+  // Planetary rings drawn before bodies so planet disk overlays inner ring
+  const jupiterState = bodyStates.get("jupiter");
+  if (jupiterState) {
+    const jScreen = worldToScreen(jupiterState.position, camera, width, height);
+    drawPlanetaryRing(ctx, jScreen.x, jScreen.y, JUPITER_RING_INNER_KM, JUPITER_RING_OUTER_KM, camera.kmPerPixel,
+      "rgba(180, 160, 120, 0.15)", "rgba(180, 160, 120, 0.3)");
+  }
+  const saturnState = bodyStates.get("saturn");
+  if (saturnState) {
+    const sScreen = worldToScreen(saturnState.position, camera, width, height);
+    drawPlanetaryRing(ctx, sScreen.x, sScreen.y, SATURN_RING_INNER_KM, SATURN_RING_OUTER_KM, camera.kmPerPixel,
+      "rgba(210, 190, 140, 0.2)", "rgba(210, 190, 140, 0.35)");
   }
 
   for (const body of bodies) {
@@ -472,7 +652,7 @@ export function renderScene(
       drawSunGlow(ctx, screen.x, screen.y, radiusPx);
     }
 
-    if (body.type === "probe") {
+    if (body.type === "probe" || body.type === "comet") {
       drawDiamond(ctx, screen.x, screen.y, Math.max(radiusPx, 3), body.color);
     } else {
       ctx.beginPath();
@@ -481,7 +661,7 @@ export function renderScene(
       ctx.fill();
     }
 
-    if (body.id === selectedBodyId) {
+    if (body.id === selectedBodyId && showSelectionIndicator) {
       drawSelectionIndicator(ctx, screen.x, screen.y, radiusPx);
     }
   }
@@ -532,7 +712,7 @@ export function renderMinimap(
     const sx = cx + state.position.x * scale;
     const sy = cy - state.position.y * scale;
 
-    const dotSize = body.type === "star" ? 3 : body.type === "probe" ? 1 : body.type === "dwarf-planet" ? 1 : 1.5;
+    const dotSize = body.type === "star" ? 3 : (body.type === "probe" || body.type === "comet") ? 1 : body.type === "dwarf-planet" ? 1 : 1.5;
     ctx.fillStyle = body.id === selectedBodyId ? "#6496ff" : body.color;
     ctx.beginPath();
     ctx.arc(sx, sy, dotSize, 0, Math.PI * 2);

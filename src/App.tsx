@@ -1,5 +1,6 @@
 import { useEffect } from "react";
-import { BodySelector, Canvas, InfoPanel, Minimap, ScaleBar, TimeControls } from "./components";
+import { BodySelector, Canvas, Canvas3D, InfoPanel, ScaleBar, TimeControls } from "./components";
+import { ZoomControls } from "./components/ZoomControls";
 import { SHORTCUT_BODIES } from "./core/data";
 import { useSimStore } from "./store";
 
@@ -12,7 +13,17 @@ export function App() {
   const toggleHumanEyeScale = useSimStore((s) => s.toggleHumanEyeScale);
   const toggleImmersiveBackground = useSimStore((s) => s.toggleImmersiveBackground);
   const toggleShowProbes = useSimStore((s) => s.toggleShowProbes);
+  const toggleShowDwarfPlanets = useSimStore((s) => s.toggleShowDwarfPlanets);
   const toggleShowHeliosphere = useSimStore((s) => s.toggleShowHeliosphere);
+  const toggleAsteroidBelt = useSimStore((s) => s.toggleAsteroidBelt);
+  const toggleKuiperBelt = useSimStore((s) => s.toggleKuiperBelt);
+  const toggleOortCloud = useSimStore((s) => s.toggleOortCloud);
+  const toggleViewMode = useSimStore((s) => s.toggleViewMode);
+  const toggleSelectionIndicator = useSimStore((s) => s.toggleSelectionIndicator);
+  const toggleEclipticPlane = useSimStore((s) => s.toggleEclipticPlane);
+  const toggleFullOrbits = useSimStore((s) => s.toggleFullOrbits);
+  const toggleShowComets = useSimStore((s) => s.toggleShowComets);
+  const viewMode = useSimStore((s) => s.viewMode);
   const leftPanelOpen = useSimStore((s) => s.leftPanelOpen);
   const rightPanelOpen = useSimStore((s) => s.rightPanelOpen);
 
@@ -52,8 +63,35 @@ export function App() {
         case "p":
           toggleShowProbes();
           break;
+        case "d":
+          toggleShowDwarfPlanets();
+          break;
+        case "a":
+          toggleAsteroidBelt();
+          break;
+        case "k":
+          toggleKuiperBelt();
+          break;
         case "h":
           toggleShowHeliosphere();
+          break;
+        case "c":
+          toggleOortCloud();
+          break;
+        case "o":
+          toggleFullOrbits();
+          break;
+        case "v":
+          toggleViewMode();
+          break;
+        case "s":
+          toggleSelectionIndicator();
+          break;
+        case "e":
+          if (useSimStore.getState().viewMode === "3d") toggleEclipticPlane();
+          break;
+        case "g":
+          toggleShowComets();
           break;
       }
     };
@@ -68,7 +106,16 @@ export function App() {
     toggleHumanEyeScale,
     toggleImmersiveBackground,
     toggleShowProbes,
+    toggleShowDwarfPlanets,
     toggleShowHeliosphere,
+    toggleAsteroidBelt,
+    toggleKuiperBelt,
+    toggleOortCloud,
+    toggleViewMode,
+    toggleSelectionIndicator,
+    toggleEclipticPlane,
+    toggleFullOrbits,
+    toggleShowComets,
   ]);
 
   const appClasses = ["app", !leftPanelOpen ? "left-collapsed" : "", !rightPanelOpen ? "right-collapsed" : ""]
@@ -79,9 +126,9 @@ export function App() {
     <div className={appClasses}>
       <BodySelector />
       <div className="viewport">
-        <Canvas />
-        <Minimap />
+        {viewMode === "2d" ? <Canvas /> : <Canvas3D />}
         <ScaleBar />
+        <ZoomControls />
       </div>
       <InfoPanel />
       <TimeControls />

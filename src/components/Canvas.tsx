@@ -27,7 +27,9 @@ export function Canvas() {
     };
 
     resizeCanvas();
-    window.addEventListener("resize", resizeCanvas);
+
+    const ro = new ResizeObserver(() => resizeCanvas());
+    ro.observe(canvas);
 
     const loop = (timestamp: number) => {
       const dtMs = lastTimeRef.current ? timestamp - lastTimeRef.current : 16;
@@ -46,13 +48,18 @@ export function Canvas() {
         state.camera,
         state.bodyStates,
         state.activeBodies,
-        state.bodyMap,
         state.selectedBodyId,
         state.humanEyeScale,
         state.simTime,
         state.immersiveBackground,
         state.system.maxOrbitRadius,
         state.showHeliosphere,
+        state.showAsteroidBelt,
+        state.showKuiperBelt,
+        state.showSelectionIndicator,
+        state.showFullOrbits,
+        state.orbitPaths,
+        state.showOortCloud,
       );
 
       animFrameRef.current = requestAnimationFrame(loop);
@@ -62,7 +69,7 @@ export function Canvas() {
 
     return () => {
       cancelAnimationFrame(animFrameRef.current);
-      window.removeEventListener("resize", resizeCanvas);
+      ro.disconnect();
     };
   }, [tick]);
 
